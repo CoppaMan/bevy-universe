@@ -103,7 +103,6 @@ fn pan_orbit_camera(
         if rotation_move.length_squared() > 0.0 {
             any = true;
             let window = get_primary_window_size(win);
-            info!(up.z);
             let delta_z = rotation_move.x / window.x * std::f32::consts::PI;
             let delta_x = {
                 let delta = rotation_move.y / window.y * std::f32::consts::PI;

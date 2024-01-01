@@ -9,17 +9,23 @@ use bevy::{
 
 mod objects;
 mod physics;
+mod renderer;
 mod ui;
 mod utils;
 
-use crate::{objects::LoadObjectsPlugins, physics::PhysicPlugin, ui::UiPlugins};
+use crate::{
+    objects::LoadObjectsPlugins, physics::PhysicPlugin, renderer::RendererPlugin, ui::UiPlugins,
+};
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins(UiPlugins)
-        .add_plugins(LoadObjectsPlugins)
-        .add_plugins(PhysicPlugin)
+        .add_plugins((
+            DefaultPlugins,
+            RendererPlugin,
+            UiPlugins,
+            LoadObjectsPlugins,
+            PhysicPlugin,
+        ))
         .add_systems(Startup, spawn_light)
         .run();
 }
