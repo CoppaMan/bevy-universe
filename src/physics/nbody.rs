@@ -4,13 +4,16 @@ use bevy::{
         query::{With, Without},
         system::Query,
     },
-    log::debug,
     math::DVec3,
     transform::components::Transform,
 };
 
 use crate::physics::components::*;
 
+///
+/// Computes the interactions on bodies with NBodyEffector caused by large bodies with MassG.
+/// Converts the gravitational force into a sum of accelerations.
+///
 pub fn nbody_accelerate(
     mut crafts_mut: Query<(&mut Acceleration, &Transform), (With<NBodyEffector>, Without<MassG>)>,
     mut planets_mut: Query<(Entity, &mut Acceleration, &Transform, &MassG), With<MassG>>,
@@ -20,7 +23,7 @@ pub fn nbody_accelerate(
         let dist = dist_vec.length();
         (other_mass / dist.powi(3)) * dist_vec
     }
-    debug!("Running nbody_accelerate");
+
     // Calculate and apply acceleration on crafts
     for (mut acc, craft_transform) in crafts_mut.iter_mut() {
         //info!("Computing forces for craft");

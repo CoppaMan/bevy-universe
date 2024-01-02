@@ -20,6 +20,7 @@ pub struct OrbitHistoryMesh {
     pub craft: Entity,
 }
 
+/// Material used for the line segments
 #[derive(Asset, TypePath, Default, AsBindGroup, Debug, Clone)]
 pub struct LineMaterial {
     #[uniform(0)]
