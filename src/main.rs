@@ -1,8 +1,10 @@
 use bevy::{
     app::{App, Startup},
+    core_pipeline::clear_color::ClearColor,
     ecs::system::Commands,
     math::Vec3,
-    pbr::{CascadeShadowConfigBuilder, DirectionalLight, DirectionalLightBundle},
+    pbr::{AmbientLight, CascadeShadowConfigBuilder, DirectionalLight, DirectionalLightBundle},
+    render::color::Color,
     transform::components::Transform,
     DefaultPlugins,
 };
@@ -31,6 +33,13 @@ fn main() {
 }
 
 fn spawn_light(mut commands: Commands) {
+    commands.insert_resource(AmbientLight {
+        color: Color::BLACK,
+        brightness: 0.,
+    });
+
+    commands.insert_resource(ClearColor(Color::BLACK));
+
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
             illuminance: 25000.,
