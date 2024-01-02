@@ -28,8 +28,8 @@ use {
 };
 
 use bevy::{
-    ecs::schedule::IntoSystemConfigs, time::common_conditions::on_timer,
-    transform::components::GlobalTransform,
+    ecs::schedule::IntoSystemConfigs, render::view::NoFrustumCulling,
+    time::common_conditions::on_timer, transform::components::GlobalTransform,
 };
 
 use crate::{
@@ -111,6 +111,7 @@ fn spawn_crafts(
                 orbit_mesh: mesh_id,
                 craft: craft_id,
             },
+            NoFrustumCulling,
         ));
 
         info!(
@@ -234,5 +235,7 @@ fn update_orbit_history(
         // Append new entry
         points.push(craft_pos);
         mesh_mut.insert_attribute(Mesh::ATTRIBUTE_POSITION, points);
+        let aabb = mesh_mut.compute_aabb().expect("");
+        info!("Bounding box: {:?}", aabb);
     }
 }
