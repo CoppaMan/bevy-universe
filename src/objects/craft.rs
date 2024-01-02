@@ -27,10 +27,13 @@ use {
     std::fs::{create_dir_all, read_dir, read_to_string},
 };
 
-use bevy::{ecs::schedule::IntoSystemConfigs, time::common_conditions::on_timer};
+use bevy::{
+    ecs::schedule::IntoSystemConfigs, time::common_conditions::on_timer,
+    transform::components::GlobalTransform,
+};
 
 use crate::{
-    objects::components::FocusSphere,
+    objects::components::Focusable,
     physics::components::{Acceleration, NBodyEffector, Velocity},
     renderer::line::{LineMaterial, LineStrip, OrbitHistoryMesh},
     utils::{self, vectors::f32_3_to_vec3},
@@ -126,6 +129,7 @@ struct CraftBundle {
     entity_type: Craft,
     velocity: Velocity,
     acceleration: Acceleration,
+    focusable: Focusable,
 
     #[bundle()]
     spatial: SpatialBundle,
@@ -138,6 +142,10 @@ impl CraftBundle {
             entity_type: Craft,
             velocity: Velocity(velocity),
             acceleration: Acceleration(DVec3::ZERO),
+            focusable: Focusable {
+                focus_min_distance: 10.,
+                focus_sphere_radius: 100000.,
+            },
             spatial: SpatialBundle {
                 transform: Transform::from_translation(position.as_vec3()),
                 ..Default::default()
@@ -167,7 +175,6 @@ pub struct CraftLabel;
 #[derive(Bundle)]
 struct CraftLabelBundle {
     entity_type: CraftLabel,
-    focusable: FocusSphere,
 
     #[bundle()]
     label_plane: PbrBundle,
@@ -177,7 +184,6 @@ impl CraftLabelBundle {
     fn new(mesh: Handle<Mesh>, material: Handle<StandardMaterial>) -> Self {
         Self {
             entity_type: CraftLabel,
-            focusable: FocusSphere(10.),
             label_plane: PbrBundle {
                 mesh: mesh,
                 material: material,
@@ -188,17 +194,20 @@ impl CraftLabelBundle {
 }
 
 fn orient_labels(
-    mut labels_mut: Query<&mut Transform, (With<CraftLabel>, Without<Camera3d>, Without<Craft>)>,
-    camera: Query<&Transform, (With<Camera3d>, Without<CraftLabel>, Without<Craft>)>,
+    mut labels_mut: Query<
+        (&mut Transform, &GlobalTransform),
+        (With<CraftLabel>, Without<Camera3d>, Without<Craft>),
+    >,
+    camera: Query<&GlobalTransform, (With<Camera3d>, Without<CraftLabel>, Without<Craft>)>,
 ) {
-    for mut label_transform in labels_mut.iter_mut() {
+    for (mut label_transform, label_global) in labels_mut.iter_mut() {
         let camera_transform = camera
             .get_single()
             .expect("There should be exactly on camera");
 
-        let look_at = label_transform.translation - camera_transform.translation;
+        let look_at = label_global.translation() - camera_transform.translation();
         label_transform.look_at(look_at, Vec3::Z);
-        label_transform.scale = Vec3::ONE * look_at.length() * 2e-2;
+        label_transform.scale = Vec3::ONE * look_at.length() * 4e-2;
     }
 }
 

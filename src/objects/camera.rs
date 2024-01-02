@@ -1,83 +1,137 @@
 use bevy::{
     app::{App, Plugin, Startup, Update},
-    core_pipeline::clear_color::ClearColorConfig,
-    core_pipeline::core_3d::Camera3dBundle,
+    core_pipeline::{clear_color::ClearColorConfig, core_3d::Camera3dBundle},
     ecs::{
         event::*,
         system::{Commands, Query, Res},
     },
     input::{mouse::*, Input},
-    math::Mat3,
-    math::{Quat, Vec2, Vec3},
+    math::{Mat3, Quat, Vec2, Vec3},
     prelude::*,
     transform::components::Transform,
 };
+
+use super::components::Focusable;
 
 pub struct SpawnCameraPlugin;
 
 impl Plugin for SpawnCameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_camera)
-            .add_systems(Update, pan_orbit_camera);
+            .add_systems(Update, (pan_orbit_camera, change_camera_focus));
     }
-}
-
-#[derive(Component)]
-struct PanOrbitCamera {
-    /// The "focus point" to orbit around. It is automatically updated when panning the camera
-    pub focus: Vec3,
-    pub radius: f32,
 }
 
 fn spawn_camera(mut commands: Commands) {
     let camera_start_pos = Vec3::new(-20000000.0, 0.0, 0.0);
 
-    commands.spawn((
-        Camera3dBundle {
-            transform: Transform::from_translation(camera_start_pos)
-                .looking_at(Vec3::new(1., 0., 0.), Vec3::Z),
-            projection: Projection::Perspective(PerspectiveProjection {
-                fov: 1.0472,
-                ..Default::default()
-            }),
-            camera_3d: Camera3d {
-                clear_color: ClearColorConfig::Custom(Color::BLACK),
-                ..Default::default()
-            },
+    commands.spawn((Camera3dBundle {
+        transform: Transform::from_translation(camera_start_pos)
+            .looking_at(Vec3::new(1., 0., 0.), Vec3::Z),
+        projection: Projection::Perspective(PerspectiveProjection {
+            fov: 1.0472,
+            ..Default::default()
+        }),
+        camera_3d: Camera3d {
+            clear_color: ClearColorConfig::Custom(Color::BLACK),
             ..Default::default()
         },
-        PanOrbitCamera {
-            radius: camera_start_pos.length(),
-            focus: Vec3::ZERO,
-        },
-    ));
+        ..Default::default()
+    },));
 }
 
-/*
-fn focus_object(
+fn change_camera_focus(
     win_q: Query<&Window>,
     input_mouse: Res<Input<MouseButton>>,
-    focus: Query<&Transform, With<FocusSphere>>,
-    mut camera_q: Query<(&mut PanOrbitCamera, &GlobalTransform, &Camera), With<Camera3d>>,
+    focus: Query<(Entity, &GlobalTransform, &Focusable), With<Focusable>>,
+    mut camera_q: Query<(Entity, &GlobalTransform, &Camera, &mut Transform), With<Camera3d>>,
+    mut commands: Commands,
 ) {
-    if input_mouse.pressed(MouseButton::Left) {
+    if input_mouse.just_released(MouseButton::Left) {
+        info!("Checking for new focus for camera");
         let window = win_q.get_single().expect("");
-        let (mut camera_orbit, camera_transform, camera) = camera_q.get_single().expect("");
-        for mut focus_transform in focus.iter() {
+        let (camera_id, camera_transform, camera, mut cam_transform_mut) =
+            camera_q.get_single_mut().expect("");
+
+        let mut closest_id = Entity::PLACEHOLDER;
+        let mut closest_distance = f32::MAX;
+        let mut closest_transform = GlobalTransform::IDENTITY;
+        for (entity_id, focus_transform, focus_foc) in focus.iter() {
+            info!("Test for intersection with {:?}", entity_id);
             let ray = camera
                 .viewport_to_world(camera_transform, window.cursor_position().expect(""))
                 .expect("");
+
+            info!("{:?} Ray is: {:?}", entity_id, ray);
+
+            // Compute intersection
+            let m = ray.origin - focus_transform.translation();
+            let b = m.dot(ray.direction);
+            let c =
+                m.dot(m) - (focus_foc.focus_sphere_radius * focus_foc.focus_sphere_radius) as f32;
+
+            // Exit if r’s origin outside s (c > 0) and r pointing away from s (b > 0)
+            if c > 0.0 && b > 0.0 {
+                // No intersection possible
+                info!("{:?} Pointing away", entity_id);
+                continue;
+            }
+
+            let discr = (b * b) - c;
+            info!("{:?} Discriminant: {}", entity_id, discr);
+
+            // A negative discriminant corresponds to ray missing sphere
+            if discr < 0.0 {
+                info!("{:?} Missing sphere", entity_id);
+                continue;
+            }
+
+            // Ray now found to intersect sphere, compute smallest t value of intersection
+            let t = -b - discr.sqrt();
+            if t <= closest_distance {
+                info!("{:?} Found intersection at {}", entity_id, t);
+                closest_distance = t;
+                closest_id = entity_id;
+                closest_transform = *focus_transform;
+            } else {
+                info!(
+                    "{:?} Is further away then {:?}: {} vs {}",
+                    entity_id, closest_id, t, closest_distance
+                );
+            }
         }
+
+        // Change camera focus when new focus point was selected
+        if closest_id != Entity::PLACEHOLDER {
+            info!("{:?} is closest", closest_id);
+
+            commands
+                .get_entity(closest_id)
+                .unwrap()
+                .push_children(&[camera_id]);
+
+            cam_transform_mut.translation =
+                camera_transform.translation() - closest_transform.translation();
+
+            let new_dir = -cam_transform_mut.translation;
+            cam_transform_mut.look_at(new_dir, Vec3::Z);
+        } else {
+            info!("No intersection found")
+        }
+
+        info!(
+            "Camera transform {:?}\nFocus transform {:?}",
+            camera_transform, closest_transform
+        )
     }
 }
-*/
 
 fn pan_orbit_camera(
     win_q: Query<&Window>,
     mut ev_motion: EventReader<MouseMotion>,
     mut ev_scroll: EventReader<MouseWheel>,
     input_mouse: Res<Input<MouseButton>>,
-    mut query: Query<(&mut PanOrbitCamera, &mut Transform, &Projection)>,
+    mut query: Query<&mut Transform, With<Camera>>,
 ) {
     // change input mapping for orbit and panning here
     let orbit_button = MouseButton::Right;
@@ -96,8 +150,9 @@ fn pan_orbit_camera(
         scroll += ev.y;
     }
 
-    for (mut pan_orbit, mut transform, _) in query.iter_mut() {
-        let up = transform.rotation * Vec3::Z;
+    for mut transform in query.iter_mut() {
+        let up: Vec3 = transform.rotation * Vec3::Z;
+        let mut distance = transform.translation.length();
 
         let mut any = false;
         if rotation_move.length_squared() > 0.0 {
@@ -118,9 +173,10 @@ fn pan_orbit_camera(
             transform.rotation = transform.rotation * pitch; // rotate around local x axis
         } else if scroll.abs() > 0.0 {
             any = true;
-            pan_orbit.radius -= scroll * pan_orbit.radius * 0.2;
+            distance -= scroll * distance * 0.2;
+
             // dont allow zoom to reach zero or you get stuck
-            pan_orbit.radius = f32::max(pan_orbit.radius, 0.05);
+            distance = f32::max(distance, 0.05);
         }
 
         if any {
@@ -128,8 +184,7 @@ fn pan_orbit_camera(
             // parent = x and y rotation
             // child = z-offset
             let rot_matrix = Mat3::from_quat(transform.rotation);
-            transform.translation =
-                pan_orbit.focus + rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, pan_orbit.radius));
+            transform.translation = rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, distance));
         }
     }
 

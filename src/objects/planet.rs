@@ -25,7 +25,7 @@ use crate::{
     utils,
 };
 
-use super::components::FocusSphere;
+use super::components::Focusable;
 
 pub struct SpawnPlanetsPlugin;
 impl Plugin for SpawnPlanetsPlugin {
@@ -96,7 +96,7 @@ struct PlanetParser {
 
 struct PlanetBundle {
     entity_type: Planet,
-    focusable: FocusSphere,
+    focusable: Focusable,
     transform: Transform,
     velocity: Velocity,
     acceleration: Acceleration,
@@ -107,7 +107,10 @@ impl PlanetBundle {
     fn new(position: DVec3, velocity: DVec3, mass: f64) -> Self {
         Self {
             entity_type: Planet,
-            focusable: FocusSphere(6371000.),
+            focusable: Focusable {
+                focus_min_distance: 7000000.,
+                focus_sphere_radius: 6371000.,
+            },
             transform: Transform {
                 translation: position.as_vec3(),
                 rotation: Quat::IDENTITY,
