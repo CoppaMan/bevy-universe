@@ -11,33 +11,50 @@ use bevy::{
     transform::components::Transform,
 };
 
-use super::components::Focusable;
+use crate::objects::{components::Focusable, planet::Planet, systemsets::ObjectSets};
 
 pub struct SpawnCameraPlugin;
 
 impl Plugin for SpawnCameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_camera)
-            .add_systems(Update, (pan_orbit_camera, change_camera_focus));
+        // Only spawn the camera after the planets have been spawned
+        app.configure_sets(
+            Startup,
+            ObjectSets::SpawnCamera.after(ObjectSets::SpawnPlanet),
+        )
+        .add_systems(Startup, spawn_camera.in_set(ObjectSets::SpawnCamera))
+        .add_systems(Update, (pan_orbit_camera, change_camera_focus));
     }
 }
 
-fn spawn_camera(mut commands: Commands) {
-    let camera_start_pos = Vec3::new(-20000000.0, 0.0, 0.0);
+fn spawn_camera(mut commands: Commands, planets: Query<Entity, With<Planet>>) {
+    info!("Spawning camera");
+    let camera_start_pos = Vec3::new(-10000000.0, 0.0, 0.0);
 
-    commands.spawn((Camera3dBundle {
-        transform: Transform::from_translation(camera_start_pos)
-            .looking_at(Vec3::new(1., 0., 0.), Vec3::Z),
-        projection: Projection::Perspective(PerspectiveProjection {
-            fov: 1.0472,
+    let camera = commands
+        .spawn((Camera3dBundle {
+            transform: Transform::from_translation(camera_start_pos)
+                .looking_at(Vec3::new(1., 0., 0.), Vec3::Z),
+            projection: Projection::Perspective(PerspectiveProjection {
+                fov: 1.0472,
+                ..Default::default()
+            }),
+            camera_3d: Camera3d {
+                clear_color: ClearColorConfig::Custom(Color::BLACK),
+                ..Default::default()
+            },
             ..Default::default()
-        }),
-        camera_3d: Camera3d {
-            clear_color: ClearColorConfig::Custom(Color::BLACK),
-            ..Default::default()
-        },
-        ..Default::default()
-    },));
+        },))
+        .id();
+
+    for planet in planets.iter() {
+        commands
+            .get_entity(planet)
+            .unwrap()
+            .push_children(&[camera]);
+        info!("Attached camera to planet {:?}", planet);
+        break;
+    }
 }
 
 fn change_camera_focus(
@@ -131,7 +148,8 @@ fn pan_orbit_camera(
     mut ev_motion: EventReader<MouseMotion>,
     mut ev_scroll: EventReader<MouseWheel>,
     input_mouse: Res<Input<MouseButton>>,
-    mut query: Query<&mut Transform, With<Camera>>,
+    mut query: Query<(&Parent, &mut Transform), With<Camera>>,
+    center_object_q: Query<&Focusable>,
 ) {
     // change input mapping for orbit and panning here
     let orbit_button = MouseButton::Right;
@@ -150,11 +168,13 @@ fn pan_orbit_camera(
         scroll += ev.y;
     }
 
-    for mut transform in query.iter_mut() {
+    for (center, mut transform) in query.iter_mut() {
         let up: Vec3 = transform.rotation * Vec3::Z;
         let mut distance = transform.translation.length();
 
         let mut any = false;
+
+        // Panning
         if rotation_move.length_squared() > 0.0 {
             any = true;
             let window = get_primary_window_size(win);
@@ -171,12 +191,18 @@ fn pan_orbit_camera(
             let pitch = Quat::from_rotation_x(-delta_x);
             transform.rotation = roll * transform.rotation; // rotate around global y axis
             transform.rotation = transform.rotation * pitch; // rotate around local x axis
+
+        // Zooming
         } else if scroll.abs() > 0.0 {
             any = true;
-            distance -= scroll * distance * 0.2;
 
-            // dont allow zoom to reach zero or you get stuck
-            distance = f32::max(distance, 0.05);
+            // New distance can only be larger than minimum focus distance
+            let center_object = center_object_q.get(center.get()).expect("");
+            let new_distance = distance - scroll * distance * 0.2;
+            if new_distance > center_object.focus_min_distance as f32 {
+                distance = new_distance;
+            }
+            info!("Zoom distance: {}", distance);
         }
 
         if any {

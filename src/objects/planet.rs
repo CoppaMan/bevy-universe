@@ -5,11 +5,16 @@ use {
         ecs::{
             bundle::Bundle,
             component::Component,
+            schedule::{apply_deferred, IntoSystemConfigs},
             system::{Commands, Res, ResMut},
         },
+        log::info,
         math::{DVec3, Quat, Vec3},
         pbr::{ParallaxMappingMethod, PbrBundle, StandardMaterial},
-        render::mesh::{shape::UVSphere, Mesh},
+        render::{
+            color::Color,
+            mesh::{shape::UVSphere, Mesh},
+        },
         transform::components::Transform,
     },
     directories::ProjectDirs,
@@ -18,19 +23,22 @@ use {
     std::fs::{create_dir_all, read_dir, read_to_string},
 };
 
-use bevy::{log::info, render::color::Color};
-
 use crate::{
+    objects::{components::Focusable, systemsets::ObjectSets},
     physics::components::{Acceleration, MassG, Velocity},
     utils,
 };
 
-use super::components::Focusable;
-
 pub struct SpawnPlanetsPlugin;
 impl Plugin for SpawnPlanetsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_planets);
+        // Apply deferred to ensure planets have been created
+        app.add_systems(
+            Startup,
+            (spawn_planets, apply_deferred)
+                .chain()
+                .in_set(ObjectSets::SpawnPlanet),
+        );
     }
 }
 

@@ -7,19 +7,21 @@ use {
             bundle::Bundle,
             component::Component,
             query::{With, Without},
+            schedule::IntoSystemConfigs,
             system::{Commands, Query, Res, ResMut},
         },
         hierarchy::BuildChildren,
         log::info,
         math::{DVec3, Vec2, Vec3},
-        pbr::MaterialMeshBundle,
-        pbr::{AlphaMode, PbrBundle, StandardMaterial},
+        pbr::{AlphaMode, MaterialMeshBundle, PbrBundle, StandardMaterial},
         render::{
             color::Color,
             mesh::{shape::Quad, Mesh},
             prelude::SpatialBundle,
+            view::NoFrustumCulling,
         },
-        transform::components::Transform,
+        time::common_conditions::on_timer,
+        transform::components::{GlobalTransform, Transform},
         utils::Duration,
     },
     directories::ProjectDirs,
@@ -27,13 +29,8 @@ use {
     std::fs::{create_dir_all, read_dir, read_to_string},
 };
 
-use bevy::{
-    ecs::schedule::IntoSystemConfigs, render::view::NoFrustumCulling,
-    time::common_conditions::on_timer, transform::components::GlobalTransform,
-};
-
 use crate::{
-    objects::components::Focusable,
+    objects::{components::Focusable, systemsets::ObjectSets},
     physics::components::{Acceleration, NBodyEffector, Velocity},
     renderer::line::{LineMaterial, LineStrip, OrbitHistoryMesh},
     utils::{self, vectors::f32_3_to_vec3},
@@ -43,13 +40,14 @@ pub struct SpawnCraftPlugin;
 
 impl Plugin for SpawnCraftPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_crafts).add_systems(
-            Update,
-            (
-                orient_labels,
-                update_orbit_history.run_if(on_timer(Duration::from_millis(100))),
-            ),
-        );
+        app.add_systems(Startup, spawn_crafts.in_set(ObjectSets::SpawnCraft))
+            .add_systems(
+                Update,
+                (
+                    orient_labels,
+                    update_orbit_history.run_if(on_timer(Duration::from_millis(100))),
+                ),
+            );
     }
 }
 
@@ -144,7 +142,7 @@ impl CraftBundle {
             velocity: Velocity(velocity),
             acceleration: Acceleration(DVec3::ZERO),
             focusable: Focusable {
-                focus_min_distance: 10.,
+                focus_min_distance: 1000.,
                 focus_sphere_radius: 100000.,
             },
             spatial: SpatialBundle {
@@ -230,12 +228,9 @@ fn update_orbit_history(
             .iter()
             .map(|x| f32_3_to_vec3(x))
             .collect();
-        //info!("Points: {:?}", points);
 
         // Append new entry
         points.push(craft_pos);
         mesh_mut.insert_attribute(Mesh::ATTRIBUTE_POSITION, points);
-        let aabb = mesh_mut.compute_aabb().expect("");
-        info!("Bounding box: {:?}", aabb);
     }
 }
