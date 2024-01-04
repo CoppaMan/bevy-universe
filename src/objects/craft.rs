@@ -75,12 +75,7 @@ fn spawn_crafts(
             ..Default::default()
         });
 
-        let line_mesh = meshes.add(Mesh::from(LineStrip {
-            points: vec![
-                //Vec3::new(0., 5000000., 0.),
-                //Vec3::new(0., 5000000., 100000.),
-            ],
-        }));
+        let line_mesh = meshes.add(Mesh::from(LineStrip { points: vec![] }));
 
         let mesh_id = line_mesh.id();
         let craft_id = commands

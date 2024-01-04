@@ -116,7 +116,7 @@ impl PlanetBundle {
         Self {
             entity_type: Planet,
             focusable: Focusable {
-                focus_min_distance: 7000000.,
+                focus_min_distance: 6511000.,
                 focus_sphere_radius: 6371000.,
             },
             transform: Transform {

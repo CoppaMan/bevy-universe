@@ -149,7 +149,7 @@ fn pan_orbit_camera(
     mut ev_scroll: EventReader<MouseWheel>,
     input_mouse: Res<Input<MouseButton>>,
     mut query: Query<(&Parent, &mut Transform), With<Camera>>,
-    center_object_q: Query<&Focusable>,
+    center_object_q: Query<(&Focusable, &GlobalTransform)>,
 ) {
     // change input mapping for orbit and panning here
     let orbit_button = MouseButton::Right;
@@ -171,6 +171,7 @@ fn pan_orbit_camera(
     for (center, mut transform) in query.iter_mut() {
         let up: Vec3 = transform.rotation * Vec3::Z;
         let mut distance = transform.translation.length();
+        let (_, center_transform) = center_object_q.get(center.get()).expect("");
 
         let mut any = false;
 
@@ -196,12 +197,8 @@ fn pan_orbit_camera(
         } else if scroll.abs() > 0.0 {
             any = true;
 
-            // New distance can only be larger than minimum focus distance
-            let center_object = center_object_q.get(center.get()).expect("");
             let new_distance = distance - scroll * distance * 0.2;
-            if new_distance > center_object.focus_min_distance as f32 {
-                distance = new_distance;
-            }
+            distance = new_distance;
             info!("Zoom distance: {}", distance);
         }
 
@@ -210,7 +207,22 @@ fn pan_orbit_camera(
             // parent = x and y rotation
             // child = z-offset
             let rot_matrix = Mat3::from_quat(transform.rotation);
-            transform.translation = rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, distance));
+            let new_pos_rel = rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, distance));
+            let new_pos_abs = new_pos_rel + center_transform.translation();
+
+            // Check if the new position lies within any minimum focus radius
+            let mut collides = false;
+            for (candidate_focus, candidate_transform) in center_object_q.iter() {
+                if (new_pos_abs - candidate_transform.translation()).length()
+                    < candidate_focus.focus_min_distance as f32
+                {
+                    collides = true;
+                }
+            }
+
+            if !collides {
+                transform.translation = new_pos_rel;
+            }
         }
     }
 
