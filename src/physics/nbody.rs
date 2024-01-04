@@ -47,8 +47,8 @@ pub fn nbody_accelerate(
                 continue;
             }
             planet_acc_change += gravity_acc(
-                transform_dst.translation.as_dvec3(),
                 transform_src.translation.as_dvec3(),
+                transform_dst.translation.as_dvec3(),
                 mass.0,
             )
         }
