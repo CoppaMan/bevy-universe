@@ -20,9 +20,7 @@ use {
             prelude::SpatialBundle,
             view::NoFrustumCulling,
         },
-        time::common_conditions::on_timer,
         transform::components::{GlobalTransform, Transform},
-        utils::Duration,
     },
     directories::ProjectDirs,
     serde::{Deserialize, Serialize},
@@ -41,13 +39,7 @@ pub struct SpawnCraftPlugin;
 impl Plugin for SpawnCraftPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_crafts.in_set(ObjectSets::SpawnCraft))
-            .add_systems(
-                Update,
-                (
-                    orient_labels,
-                    update_orbit_history.run_if(on_timer(Duration::from_millis(100))),
-                ),
-            );
+            .add_systems(Update, (orient_labels, update_orbit_history));
     }
 }
 
