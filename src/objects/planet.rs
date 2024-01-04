@@ -10,11 +10,8 @@ use {
         },
         log::info,
         math::{DVec3, Quat, Vec3},
-        pbr::{ParallaxMappingMethod, PbrBundle, StandardMaterial},
-        render::{
-            color::Color,
-            mesh::{shape::UVSphere, Mesh},
-        },
+        pbr::{PbrBundle, StandardMaterial},
+        render::mesh::{shape::UVSphere, Mesh},
         transform::components::Transform,
     },
     directories::ProjectDirs,
@@ -25,7 +22,7 @@ use {
 
 use crate::{
     objects::{components::Focusable, systemsets::ObjectSets},
-    physics::components::{Acceleration, MassG, Velocity},
+    physics::components::{Acceleration, MassG, NBodyEffector, Velocity},
     utils,
 };
 
@@ -59,20 +56,24 @@ fn spawn_planets(
     for planet_file in planet_file_paths {
         let planet_file_path = &planet_file.expect("").path();
         let planet_string = read_to_string(planet_file_path).expect("");
+        let parser: PlanetParser = serde_json::from_str(&planet_string).expect("");
+        let planet_name = planet_file_path.file_stem().expect("").to_str().expect("");
 
         let mesh_handle = meshes.add(Mesh::from(UVSphere {
-            radius: 6371000.,
+            radius: parser.radius as f32,
             sectors: 64,
             stacks: 64,
         }));
         let material_handle = materials.add(StandardMaterial {
-            base_color_texture: Some(asset_server.load("earth/base_color.jpg")),
-            depth_map: Some(asset_server.load("earth/elevation_surface.jpg")),
+            base_color_texture: Some(asset_server.load(format!("{}/base_color.jpg", planet_name))),
+            /*depth_map: Some(asset_server.load(format!("{}/elevation_surface.jpg", planet_name))),
             parallax_mapping_method: ParallaxMappingMethod::Relief { max_steps: 4 },
-            emissive_texture: Some(asset_server.load("earth/emissive.jpg")),
+            emissive_texture: Some(asset_server.load(format!("{}/emissive.jpg", planet_name))),
             emissive: Color::hsl(0.0, 0.0, 0.5),
-            metallic_roughness_texture: Some(asset_server.load("earth/metallic_roughness.png")),
-            normal_map_texture: Some(asset_server.load("earth/normal_map.jpg")),
+            metallic_roughness_texture: Some(
+                asset_server.load(format!("{}/metallic_roughness.png", planet_name)),
+            ),
+            normal_map_texture: Some(asset_server.load(format!("{}/normal_map.jpg", planet_name))),*/
             ..Default::default()
         });
 
@@ -82,7 +83,7 @@ fn spawn_planets(
                 material: material_handle,
                 ..Default::default()
             })
-            .insert(PlanetBundle::from_json(&planet_string));
+            .insert(PlanetBundle::from_parser(&parser));
         info!(
             "Spawned planet {}",
             planet_file_path.as_os_str().to_str().expect("")
@@ -98,12 +99,14 @@ struct PlanetParser {
     position: Vec<f64>,
     velocity: Vec<f64>,
     mass: f64,
+    radius: f64,
 }
 
 #[derive(Bundle)]
 
 struct PlanetBundle {
     entity_type: Planet,
+    nbody: NBodyEffector,
     focusable: Focusable,
     transform: Transform,
     velocity: Velocity,
@@ -112,12 +115,13 @@ struct PlanetBundle {
 }
 
 impl PlanetBundle {
-    fn new(position: DVec3, velocity: DVec3, mass: f64) -> Self {
+    fn new(position: DVec3, velocity: DVec3, mass: f64, radius: f64) -> Self {
         Self {
             entity_type: Planet,
+            nbody: NBodyEffector,
             focusable: Focusable {
-                focus_min_distance: 6511000.,
-                focus_sphere_radius: 6371000.,
+                focus_min_distance: radius * 1.006,
+                focus_sphere_radius: radius,
             },
             transform: Transform {
                 translation: position.as_vec3(),
@@ -130,13 +134,12 @@ impl PlanetBundle {
         }
     }
 
-    fn from_json(data: &str) -> Self {
-        let c: PlanetParser = serde_json::from_str(data).expect("");
-
+    fn from_parser(parser: &PlanetParser) -> Self {
         PlanetBundle::new(
-            utils::vectors::vec_to_dvec3(&c.position),
-            utils::vectors::vec_to_dvec3(&c.velocity),
-            c.mass,
+            utils::vectors::vec_to_dvec3(&parser.position),
+            utils::vectors::vec_to_dvec3(&parser.velocity),
+            parser.mass,
+            parser.radius,
         )
     }
 }
