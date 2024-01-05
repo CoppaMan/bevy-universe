@@ -14,7 +14,6 @@ use {
         render::mesh::{shape::UVSphere, Mesh},
         transform::components::Transform,
     },
-    directories::ProjectDirs,
     physical_constants::NEWTONIAN_CONSTANT_OF_GRAVITATION,
     serde::{Deserialize, Serialize},
     std::fs::{create_dir_all, read_dir, read_to_string},
@@ -23,7 +22,10 @@ use {
 use crate::{
     objects::{components::Focusable, systemsets::ObjectSets},
     physics::components::{Acceleration, MassG, NBodyEffector, Velocity},
-    utils,
+    utils::{
+        self,
+        data::{get_data_dir, DataDir},
+    },
 };
 
 pub struct SpawnPlanetsPlugin;
@@ -45,10 +47,7 @@ fn spawn_planets(
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
-    let proj_dir = ProjectDirs::from("com", "CoppaCom", "BeviPoc")
-        .expect("")
-        .data_dir()
-        .join("planets");
+    let proj_dir = get_data_dir(DataDir::Planets);
 
     create_dir_all(&proj_dir).expect("");
     let planet_file_paths = read_dir(&proj_dir).expect("Unable to read craft files");

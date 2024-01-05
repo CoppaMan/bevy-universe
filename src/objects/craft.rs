@@ -22,7 +22,6 @@ use {
         },
         transform::components::{GlobalTransform, Transform},
     },
-    directories::ProjectDirs,
     serde::{Deserialize, Serialize},
     std::fs::{create_dir_all, read_dir, read_to_string},
 };
@@ -31,7 +30,11 @@ use crate::{
     objects::{components::Focusable, systemsets::ObjectSets},
     physics::components::{Acceleration, NBodyEffector, Velocity},
     renderer::line::{LineMaterial, LineStrip, OrbitHistoryMesh},
-    utils::{self, vectors::f32_3_to_vec3},
+    utils::{
+        self,
+        data::{get_data_dir, DataDir},
+        vectors::f32_3_to_vec3,
+    },
 };
 
 pub struct SpawnCraftPlugin;
@@ -50,10 +53,7 @@ fn spawn_crafts(
     mut materials_line: ResMut<Assets<LineMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
-    let proj_dir = ProjectDirs::from("com", "CoppaCom", "BeviPoc")
-        .expect("")
-        .data_dir()
-        .join("crafts");
+    let proj_dir = get_data_dir(DataDir::Crafts);
 
     create_dir_all(&proj_dir).expect("");
     let craft_file_paths = read_dir(&proj_dir).expect("Unable to read craft files");

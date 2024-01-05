@@ -2,8 +2,9 @@ use bevy::{
     app::{App, Startup},
     core_pipeline::clear_color::ClearColor,
     ecs::system::Commands,
+    log::info,
     math::Vec3,
-    pbr::{AmbientLight, CascadeShadowConfigBuilder, DirectionalLight, DirectionalLightBundle},
+    pbr::{AmbientLight, DirectionalLight, DirectionalLightBundle},
     render::color::Color,
     transform::components::Transform,
     DefaultPlugins,
@@ -15,11 +16,20 @@ mod renderer;
 mod ui;
 mod utils;
 
+use utils::{arguments::parse_arguments, data::create_data};
+
 use crate::{
     objects::LoadObjectsPlugins, physics::PhysicPlugin, renderer::RendererPlugin, ui::UiPlugins,
 };
 
 fn main() {
+    // Create the data directory with example bodies
+    let args = parse_arguments();
+    if args.create_data {
+        info!("Creating data dir");
+        create_data("data".into());
+    }
+
     App::new()
         .add_plugins((
             DefaultPlugins,
@@ -48,15 +58,6 @@ fn spawn_light(mut commands: Commands) {
         },
         transform: Transform::from_xyz(-20000000.0, 0.0, 0.0)
             .looking_at(Vec3::new(1.0, 0.0, 0.0), Vec3::Z),
-        // The default cascade config is designed to handle large scenes.
-        // As this example has a much smaller world, we can tighten the shadow
-        // bounds for better visual quality.
-        cascade_shadow_config: CascadeShadowConfigBuilder {
-            first_cascade_far_bound: 4.0,
-            maximum_distance: 10.0,
-            ..Default::default()
-        }
-        .into(),
         ..Default::default()
     });
 }
