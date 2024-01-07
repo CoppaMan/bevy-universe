@@ -17,7 +17,7 @@ use bevy::{
     },
 };
 
-use crate::physics::PhysicsTimeScale;
+use crate::physics::resources::PhysicsTimeScale;
 
 #[derive(Component)]
 struct SimSpeedChange(u16);

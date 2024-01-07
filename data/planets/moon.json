@@ -2,5 +2,7 @@
     "position": [ 384399000.0, 0.0, 0.0 ],
     "velocity": [ 0.0, 1022.0, 0.0],
     "mass": 7.342e+22,
-    "radius": 1737400
+    "radius": 1737400,
+    "axial_tilt": 0.11671017,
+    "angular_velocity": 2.7e-6
 }

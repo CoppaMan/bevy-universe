@@ -2,15 +2,20 @@ use bevy::{
     app::{App, Plugin, Update},
     ecs::{
         schedule::{IntoSystemConfigs, IntoSystemSetConfigs, Schedule, ScheduleLabel},
-        system::Resource,
         world::World,
     },
 };
 
-use crate::physics::{integrator::integrate_time, nbody::nbody_accelerate, systemsets::PhysicsSet};
+use crate::physics::{
+    integrator::integrate_time,
+    nbody::nbody_accelerate,
+    resources::{PhysicsStepScale, PhysicsTimeScale},
+    systemsets::PhysicsSet,
+};
 
 // Only expose components to world for queries
 pub mod components;
+pub mod resources;
 pub mod systemsets;
 
 // Keep the rest in module only
@@ -20,15 +25,6 @@ mod nbody;
 /// Schedule contining all physics related systems
 #[derive(ScheduleLabel, Debug, Hash, PartialEq, Eq, Clone)]
 struct PhysicsSchedule;
-
-/// Determines how many times the physics schedules are run per frame
-#[derive(Resource)]
-pub struct PhysicsTimeScale(pub u16);
-
-/// Scales the timestep duration by integer multiple.
-/// Too large values might cause instabilities during the integration step.
-#[derive(Resource)]
-pub struct PhysicsStepScale(pub u16);
 
 /// Plugin initializing the physics systems.
 /// PhysicsTimeScale and PhysicsStepScale are both initialized to 1.

@@ -19,10 +19,17 @@ use {
     std::fs::{create_dir_all, read_dir, read_to_string},
 };
 
+use std::f64::consts::PI;
+
+use bevy::{app::Update, ecs::system::Query, time::Time};
+
 use crate::{
     floatingorigin::components::FloatingOriginPosition,
     objects::{components::Focusable, systemsets::ObjectSets},
-    physics::components::{MassG, NBodyAcceleration, NBodyEffector, NBodyVelocity},
+    physics::{
+        components::{MassG, NBodyAcceleration, NBodyEffector, NBodyVelocity},
+        resources::{PhysicsStepScale, PhysicsTimeScale},
+    },
     utils::{
         self,
         data::{get_data_dir, DataDir},
@@ -38,7 +45,8 @@ impl Plugin for SpawnPlanetsPlugin {
             (spawn_planets, apply_deferred)
                 .chain()
                 .in_set(ObjectSets::SpawnPlanet),
-        );
+        )
+        .add_systems(Update, rotate_planets);
     }
 }
 
@@ -81,6 +89,9 @@ fn spawn_planets(
             .spawn(PbrBundle {
                 mesh: mesh_handle,
                 material: material_handle,
+                transform: Transform::from_rotation(Quat::from_rotation_x(
+                    parser.axial_tilt as f32,
+                )),
                 ..Default::default()
             })
             .insert(PlanetBundle::from_parser(&parser));
@@ -92,7 +103,11 @@ fn spawn_planets(
 }
 
 #[derive(Component)]
-pub struct Planet;
+pub struct Planet {
+    pub axial_tilt: f64,
+    pub spin_velocity: f64,
+    pub spin_position: f64,
+}
 
 #[derive(Serialize, Deserialize)]
 struct PlanetParser {
@@ -100,6 +115,8 @@ struct PlanetParser {
     velocity: Vec<f64>,
     mass: f64,
     radius: f64,
+    axial_tilt: f64,
+    angular_velocity: f64,
 }
 
 #[derive(Bundle)]
@@ -116,9 +133,20 @@ struct PlanetBundle {
 }
 
 impl PlanetBundle {
-    fn new(position: DVec3, velocity: DVec3, mass: f64, radius: f64) -> Self {
+    fn new(
+        position: DVec3,
+        velocity: DVec3,
+        mass: f64,
+        radius: f64,
+        axial_tilt: f64,
+        angular_velocity: f64,
+    ) -> Self {
         Self {
-            entity_type: Planet,
+            entity_type: Planet {
+                axial_tilt: axial_tilt,
+                spin_velocity: angular_velocity,
+                spin_position: 0.0,
+            },
             nbody: NBodyEffector,
             focusable: Focusable {
                 focus_min_distance: radius * 1.006,
@@ -142,6 +170,29 @@ impl PlanetBundle {
             utils::vectors::vec_to_dvec3(&parser.velocity),
             parser.mass,
             parser.radius,
+            parser.axial_tilt,
+            parser.angular_velocity,
         )
+    }
+}
+
+fn rotate_planets(
+    time: Res<Time>,
+    time_scale: Res<PhysicsTimeScale>,
+    step_scale: Res<PhysicsStepScale>,
+    mut planets_q: Query<(&mut Transform, &mut Planet)>,
+) {
+    for (mut planet_transform, mut planet) in planets_q.iter_mut() {
+        // Compute rotation and condition
+        let speed = time_scale.0 as f64 * step_scale.0 as f64 * time.delta_seconds_f64();
+        planet.spin_position += planet.spin_velocity * speed;
+        let over = (planet.spin_position / (2.0 * PI)).floor();
+        planet.spin_position -= planet.spin_position * over;
+
+        info!(planet.spin_position);
+
+        let tilt = Quat::from_rotation_x(planet.axial_tilt as f32);
+        let spin = Quat::from_rotation_z(planet.spin_position as f32);
+        planet_transform.rotation = tilt * spin;
     }
 }
