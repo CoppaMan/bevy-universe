@@ -6,3 +6,10 @@ pub enum ObjectSets {
     SpawnCraft,
     SpawnCamera,
 }
+
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub enum CameraSets {
+    CameraAll,
+    MoveCamera,
+    TrackFocus,
+}

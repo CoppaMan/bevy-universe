@@ -10,12 +10,16 @@ use bevy::{
     DefaultPlugins,
 };
 
+mod floatingorigin;
 mod objects;
+mod orbits;
 mod physics;
 mod renderer;
 mod ui;
 mod utils;
 
+use floatingorigin::FloatingOriginPlugin;
+use orbits::OrbitsPlugins;
 use utils::{arguments::parse_arguments, data::create_data};
 
 use crate::{
@@ -37,6 +41,8 @@ fn main() {
             UiPlugins,
             LoadObjectsPlugins,
             PhysicPlugin,
+            FloatingOriginPlugin,
+            OrbitsPlugins,
         ))
         .add_systems(Startup, spawn_light)
         .run();

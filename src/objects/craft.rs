@@ -5,7 +5,6 @@ use {
         core_pipeline::core_3d::Camera3d,
         ecs::{
             bundle::Bundle,
-            component::Component,
             query::{With, Without},
             schedule::IntoSystemConfigs,
             system::{Commands, Query, Res, ResMut},
@@ -27,22 +26,45 @@ use {
 };
 
 use crate::{
+    floatingorigin::components::FloatingOriginPosition,
     objects::{components::Focusable, systemsets::ObjectSets},
-    physics::components::{Acceleration, NBodyEffector, Velocity},
+    physics::components::{NBodyAcceleration, NBodyEffector, NBodyVelocity},
     renderer::line::{LineMaterial, LineStrip, OrbitHistoryMesh},
     utils::{
         self,
         data::{get_data_dir, DataDir},
-        vectors::f32_3_to_vec3,
     },
 };
+
+use super::components::{Craft, CraftLabel};
+
+#[derive(Bundle)]
+struct CraftBundle {
+    nbody: NBodyEffector,
+    entity_type: Craft,
+    position: FloatingOriginPosition,
+    velocity: NBodyVelocity,
+    acceleration: NBodyAcceleration,
+    focusable: Focusable,
+
+    #[bundle()]
+    spatial: SpatialBundle,
+}
+
+#[derive(Bundle)]
+struct CraftLabelBundle {
+    entity_type: CraftLabel,
+
+    #[bundle()]
+    label_plane: PbrBundle,
+}
 
 pub struct SpawnCraftPlugin;
 
 impl Plugin for SpawnCraftPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_crafts.in_set(ObjectSets::SpawnCraft))
-            .add_systems(Update, (orient_labels, update_orbit_history));
+            .add_systems(Update, orient_labels);
     }
 }
 
@@ -96,6 +118,7 @@ fn spawn_crafts(
                 orbit_mesh: mesh_id,
                 craft: craft_id,
             },
+            FloatingOriginPosition(DVec3::ZERO),
             NoFrustumCulling,
         ));
 
@@ -106,28 +129,14 @@ fn spawn_crafts(
     }
 }
 
-#[derive(Component)]
-pub struct Craft;
-
-#[derive(Bundle)]
-struct CraftBundle {
-    nbody: NBodyEffector,
-    entity_type: Craft,
-    velocity: Velocity,
-    acceleration: Acceleration,
-    focusable: Focusable,
-
-    #[bundle()]
-    spatial: SpatialBundle,
-}
-
 impl CraftBundle {
     fn new(position: DVec3, velocity: DVec3) -> Self {
         Self {
             nbody: NBodyEffector,
             entity_type: Craft,
-            velocity: Velocity(velocity),
-            acceleration: Acceleration(DVec3::ZERO),
+            position: FloatingOriginPosition(position),
+            velocity: NBodyVelocity(velocity),
+            acceleration: NBodyAcceleration(DVec3::ZERO),
             focusable: Focusable {
                 focus_min_distance: 1000.,
                 focus_sphere_radius: 100000.,
@@ -153,17 +162,6 @@ impl CraftBundle {
 struct CraftParser {
     position: Vec<f64>,
     velocity: Vec<f64>,
-}
-
-#[derive(Component)]
-pub struct CraftLabel;
-
-#[derive(Bundle)]
-struct CraftLabelBundle {
-    entity_type: CraftLabel,
-
-    #[bundle()]
-    label_plane: PbrBundle,
 }
 
 impl CraftLabelBundle {
@@ -194,30 +192,5 @@ fn orient_labels(
         let look_at = label_global.translation() - camera_transform.translation();
         label_transform.look_at(look_at, Vec3::Z);
         label_transform.scale = Vec3::ONE * look_at.length() * 4e-2;
-    }
-}
-
-fn update_orbit_history(
-    mut mesh_asset_mut: ResMut<Assets<Mesh>>,
-    orbits: Query<&OrbitHistoryMesh>,
-    crafts: Query<&Transform, With<Craft>>,
-) {
-    for orbit in orbits.iter() {
-        let mesh_mut = mesh_asset_mut.get_mut(orbit.orbit_mesh).expect("");
-        let craft_pos = crafts.get(orbit.craft).expect("").translation;
-
-        let points_attr_id = mesh_mut.attributes_mut().last().expect("").0;
-        let mut points: Vec<Vec3> = mesh_mut
-            .attribute(points_attr_id)
-            .expect("")
-            .as_float3()
-            .expect("")
-            .iter()
-            .map(|x| f32_3_to_vec3(x))
-            .collect();
-
-        // Append new entry
-        points.push(craft_pos);
-        mesh_mut.insert_attribute(Mesh::ATTRIBUTE_POSITION, points);
     }
 }

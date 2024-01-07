@@ -20,8 +20,9 @@ use {
 };
 
 use crate::{
+    floatingorigin::components::FloatingOriginPosition,
     objects::{components::Focusable, systemsets::ObjectSets},
-    physics::components::{Acceleration, MassG, NBodyEffector, Velocity},
+    physics::components::{MassG, NBodyAcceleration, NBodyEffector, NBodyVelocity},
     utils::{
         self,
         data::{get_data_dir, DataDir},
@@ -108,8 +109,9 @@ struct PlanetBundle {
     nbody: NBodyEffector,
     focusable: Focusable,
     transform: Transform,
-    velocity: Velocity,
-    acceleration: Acceleration,
+    position: FloatingOriginPosition,
+    velocity: NBodyVelocity,
+    acceleration: NBodyAcceleration,
     mass_g: MassG,
 }
 
@@ -127,8 +129,9 @@ impl PlanetBundle {
                 rotation: Quat::IDENTITY,
                 scale: Vec3::ONE,
             },
-            velocity: Velocity(velocity),
-            acceleration: Acceleration(DVec3::ZERO),
+            position: FloatingOriginPosition(position),
+            velocity: NBodyVelocity(velocity),
+            acceleration: NBodyAcceleration(DVec3::ZERO),
             mass_g: MassG(mass * NEWTONIAN_CONSTANT_OF_GRAVITATION),
         }
     }
