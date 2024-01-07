@@ -6,35 +6,62 @@ use bevy::{
         system::{Commands, Query, Res},
     },
     input::{mouse::*, Input},
-    math::{Mat3, Quat, Vec2, Vec3},
+    math::{DVec3, Mat3, Quat, Vec2, Vec3},
     prelude::*,
     transform::components::Transform,
 };
 
-use crate::objects::{components::Focusable, planet::Planet, systemsets::ObjectSets};
+use crate::{
+    floatingorigin::{components::FloatingOriginPosition, systemsets::FloatingOriginSet},
+    objects::{
+        components::{FocusTarget, Focusable},
+        planet::Planet,
+        systemsets::{CameraSets, ObjectSets},
+    },
+    physics::systemsets::PhysicsSet,
+};
 
 pub struct SpawnCameraPlugin;
 
 impl Plugin for SpawnCameraPlugin {
     fn build(&self, app: &mut App) {
-        // Only spawn the camera after the planets have been spawned
-        app.configure_sets(
+        app.add_systems(
             Startup,
-            ObjectSets::SpawnCamera.after(ObjectSets::SpawnPlanet),
+            spawn_camera
+                .in_set(ObjectSets::SpawnCamera)
+                .after(ObjectSets::SpawnPlanet),
         )
-        .add_systems(Startup, spawn_camera.in_set(ObjectSets::SpawnCamera))
-        .add_systems(Update, (pan_orbit_camera, change_camera_focus));
+        .add_systems(
+            Update,
+            (
+                (pan_orbit_camera, change_camera_focus)
+                    .in_set(CameraSets::MoveCamera)
+                    .before(PhysicsSet::All),
+                track_camera_focus
+                    .in_set(CameraSets::TrackFocus)
+                    .after(PhysicsSet::All)
+                    .before(FloatingOriginSet::ApplyTransform),
+            )
+                .in_set(CameraSets::CameraAll),
+        );
     }
 }
 
 fn spawn_camera(mut commands: Commands, planets: Query<Entity, With<Planet>>) {
     info!("Spawning camera");
-    let camera_start_pos = Vec3::new(-10000000.0, 0.0, 0.0);
+    let camera_start_pos = DVec3::new(-100000000.0, 0.0, 0.0);
 
-    let camera = commands
-        .spawn((Camera3dBundle {
-            transform: Transform::from_translation(camera_start_pos)
-                .looking_at(Vec3::new(1., 0., 0.), Vec3::Z),
+    // Focus on first parent
+    let mut focus = Entity::PLACEHOLDER;
+    for planet in planets.iter() {
+        info!("Attached camera to planet {:?}", planet);
+        focus = planet;
+        break;
+    }
+
+    commands.spawn((
+        (Camera3dBundle {
+            transform: Transform::IDENTITY.looking_at(Vec3::new(1., 0., 0.), Vec3::Z),
             projection: Projection::Perspective(PerspectiveProjection {
                 fov: 1.0472,
                 ..Default::default()
@@ -44,37 +71,59 @@ fn spawn_camera(mut commands: Commands, planets: Query<Entity, With<Planet>>) {
                 ..Default::default()
             },
             ..Default::default()
-        },))
-        .id();
+        },),
+        FloatingOriginPosition(camera_start_pos),
+        FocusTarget {
+            target: focus,
+            distance: camera_start_pos,
+        },
+    ));
+}
 
-    for planet in planets.iter() {
-        commands
-            .get_entity(planet)
-            .unwrap()
-            .push_children(&[camera]);
-        info!("Attached camera to planet {:?}", planet);
-        break;
-    }
+fn track_camera_focus(
+    mut camera_q: Query<(&mut FloatingOriginPosition, &FocusTarget), With<Camera>>,
+    focus_targets: Query<&FloatingOriginPosition, (With<Focusable>, Without<Camera>)>,
+) {
+    let (mut camera_origin, camera_target) = camera_q.single_mut();
+    let target_origin = focus_targets.get(camera_target.target).expect("");
+    camera_origin.0 = target_origin.0 + camera_target.distance;
 }
 
 fn change_camera_focus(
     win_q: Query<&Window>,
     input_mouse: Res<Input<MouseButton>>,
-    focus: Query<(Entity, &GlobalTransform, &Focusable), With<Focusable>>,
-    mut camera_q: Query<(Entity, &GlobalTransform, &Camera, &mut Transform), With<Camera3d>>,
-    mut commands: Commands,
+    focus: Query<
+        (
+            Entity,
+            &GlobalTransform,
+            &Focusable,
+            &FloatingOriginPosition,
+        ),
+        With<Focusable>,
+    >,
+    mut camera_q: Query<
+        (
+            &GlobalTransform,
+            &Camera,
+            &mut Transform,
+            &mut FocusTarget,
+            &FloatingOriginPosition,
+        ),
+        With<Camera3d>,
+    >,
 ) {
     if input_mouse.just_released(MouseButton::Left) {
         info!("Checking for new focus for camera");
         let window = win_q.get_single().expect("");
-        let (camera_id, camera_transform, camera, mut cam_transform_mut) =
+        let (camera_transform, camera, mut cam_transform_mut, mut focus_entity, camera_origin) =
             camera_q.get_single_mut().expect("");
 
         let mut closest_id = Entity::PLACEHOLDER;
         let mut closest_distance = f32::MAX;
         let mut closest_transform = GlobalTransform::IDENTITY;
-        for (entity_id, focus_transform, focus_foc) in focus.iter() {
-            info!("Test for intersection with {:?}", entity_id);
+        let mut closest_origin = DVec3::ZERO;
+        for (entity_id, focus_transform, focus_foc, target_origin) in focus.iter() {
+            //info!("Test for intersection with {:?}", entity_id);
             let ray = camera
                 .viewport_to_world(camera_transform, window.cursor_position().expect(""))
                 .expect("");
@@ -110,6 +159,7 @@ fn change_camera_focus(
                 closest_distance = t;
                 closest_id = entity_id;
                 closest_transform = *focus_transform;
+                closest_origin = target_origin.0;
             } else {
                 info!(
                     "{:?} Is further away then {:?}: {} vs {}",
@@ -122,16 +172,10 @@ fn change_camera_focus(
         if closest_id != Entity::PLACEHOLDER {
             info!("{:?} is closest", closest_id);
 
-            commands
-                .get_entity(closest_id)
-                .unwrap()
-                .push_children(&[camera_id]);
-
-            cam_transform_mut.translation =
-                camera_transform.translation() - closest_transform.translation();
-
-            let new_dir = -cam_transform_mut.translation;
-            cam_transform_mut.look_at(new_dir, Vec3::Z);
+            let new_distance = camera_origin.0 - closest_origin;
+            focus_entity.target = closest_id;
+            focus_entity.distance = new_distance;
+            cam_transform_mut.look_at(-new_distance.as_vec3(), Vec3::Z);
         } else {
             info!("No intersection found")
         }
@@ -148,36 +192,47 @@ fn pan_orbit_camera(
     mut ev_motion: EventReader<MouseMotion>,
     mut ev_scroll: EventReader<MouseWheel>,
     input_mouse: Res<Input<MouseButton>>,
-    mut query: Query<(&Parent, &mut Transform), With<Camera>>,
-    center_object_q: Query<(&Focusable, &GlobalTransform)>,
+    mut camera_q: Query<
+        (
+            &mut Transform,
+            &mut FloatingOriginPosition,
+            &mut FocusTarget,
+        ),
+        With<Camera>,
+    >,
+    focusable_q: Query<(&Focusable, &FloatingOriginPosition), Without<Camera>>,
 ) {
+    //info!("pan_orbit_camera");
+
     // change input mapping for orbit and panning here
     let orbit_button = MouseButton::Right;
 
+    // Get panning vector
     let mut rotation_move = Vec2::ZERO;
-    let mut scroll = 0.0;
-
-    let win = win_q.get_single().expect("");
-
     if input_mouse.pressed(orbit_button) {
         for ev in ev_motion.read() {
             rotation_move += ev.delta;
         }
     }
+
+    // Get scroll amount
+    let mut scroll_move = 0.0;
     for ev in ev_scroll.read() {
-        scroll += ev.y;
+        scroll_move += ev.y as f64;
     }
 
-    for (center, mut transform) in query.iter_mut() {
-        let up: Vec3 = transform.rotation * Vec3::Z;
-        let mut distance = transform.translation.length();
-        let (_, center_transform) = center_object_q.get(center.get()).expect("");
+    for (mut camera_transform, mut camera_origin, mut focus_target) in camera_q.iter_mut() {
+        let up: Vec3 = camera_transform.rotation * Vec3::Z;
+        let (_, focus_origin) = focusable_q.get(focus_target.target).expect("");
 
+        let mut distance = (focus_origin.0 - camera_origin.0).length();
         let mut any = false;
 
         // Panning
         if rotation_move.length_squared() > 0.0 {
             any = true;
+
+            let win = win_q.get_single().expect("");
             let window = get_primary_window_size(win);
             let delta_z = rotation_move.x / window.x * std::f32::consts::PI;
             let delta_x = {
@@ -190,38 +245,34 @@ fn pan_orbit_camera(
             };
             let roll = Quat::from_rotation_z(-delta_z);
             let pitch = Quat::from_rotation_x(-delta_x);
-            transform.rotation = roll * transform.rotation; // rotate around global y axis
-            transform.rotation = transform.rotation * pitch; // rotate around local x axis
+            camera_transform.rotation = roll * camera_transform.rotation; // rotate around global y axis
+            camera_transform.rotation = camera_transform.rotation * pitch; // rotate around local x axis
 
         // Zooming
-        } else if scroll.abs() > 0.0 {
+        } else if scroll_move.abs() > 0.0 {
             any = true;
-
-            let new_distance = distance - scroll * distance * 0.2;
-            distance = new_distance;
+            distance = distance - scroll_move * distance * 0.2;
             info!("Zoom distance: {}", distance);
         }
 
         if any {
-            // emulating parent/child to make the yaw/y-axis rotation behave like a turntable
-            // parent = x and y rotation
-            // child = z-offset
-            let rot_matrix = Mat3::from_quat(transform.rotation);
-            let new_pos_rel = rot_matrix.mul_vec3(Vec3::new(0.0, 0.0, distance));
-            let new_pos_abs = new_pos_rel + center_transform.translation();
+            // Compute new origin position after rotation
+            let rot_matrix = Mat3::from_quat(camera_transform.rotation).as_dmat3();
+            let new_pos_rel = rot_matrix.mul_vec3(DVec3::new(0.0, 0.0, distance));
+            let new_pos_abs = new_pos_rel + focus_origin.0;
 
             // Check if the new position lies within any minimum focus radius
             let mut collides = false;
-            for (candidate_focus, candidate_transform) in center_object_q.iter() {
-                if (new_pos_abs - candidate_transform.translation()).length()
-                    < candidate_focus.focus_min_distance as f32
+            for (candidate_focus, candidate_origin) in focusable_q.iter() {
+                if (new_pos_abs - candidate_origin.0).length() < candidate_focus.focus_min_distance
                 {
                     collides = true;
                 }
             }
 
             if !collides {
-                transform.translation = new_pos_rel;
+                camera_origin.0 = new_pos_abs;
+                focus_target.distance = new_pos_rel;
             }
         }
     }

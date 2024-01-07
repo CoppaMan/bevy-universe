@@ -1,16 +1,17 @@
 use bevy::{
-    app::{App, Plugin, PreUpdate},
+    app::{App, Plugin, Update},
     ecs::{
-        schedule::{IntoSystemConfigs, Schedule, ScheduleLabel},
+        schedule::{IntoSystemConfigs, IntoSystemSetConfigs, Schedule, ScheduleLabel},
         system::Resource,
         world::World,
     },
 };
 
-use crate::physics::{integrator::integrate_time, nbody::nbody_accelerate};
+use crate::physics::{integrator::integrate_time, nbody::nbody_accelerate, systemsets::PhysicsSet};
 
 // Only expose components to world for queries
 pub mod components;
+pub mod systemsets;
 
 // Keep the rest in module only
 mod integrator;
@@ -36,7 +37,12 @@ impl Plugin for PhysicPlugin {
     fn build(&self, app: &mut App) {
         // Create the Physics schedule containing all of our physics systems
         let mut schedule = Schedule::new(PhysicsSchedule);
-        schedule.add_systems((nbody_accelerate, integrate_time).chain());
+        schedule
+            .add_systems((
+                nbody_accelerate.in_set(PhysicsSet::Forces),
+                integrate_time.in_set(PhysicsSet::Integration),
+            ))
+            .configure_sets(PhysicsSet::Integration.after(PhysicsSet::Forces));
 
         // Run the Physics schedule
         fn run_physics_schedule(world: &mut World) {
@@ -55,6 +61,6 @@ impl Plugin for PhysicPlugin {
         app.insert_resource(PhysicsTimeScale(1))
             .insert_resource(PhysicsStepScale(1))
             .add_schedule(schedule)
-            .add_systems(PreUpdate, run_physics_schedule);
+            .add_systems(Update, run_physics_schedule.in_set(PhysicsSet::All));
     }
 }

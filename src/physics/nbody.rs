@@ -15,9 +15,13 @@ use crate::physics::components::*;
 /// Converts the gravitational force into a sum of accelerations.
 ///
 pub fn nbody_accelerate(
-    mut crafts_mut: Query<(&mut Acceleration, &Transform), (With<NBodyEffector>, Without<MassG>)>,
-    mut planets_mut: Query<(Entity, &mut Acceleration, &Transform, &MassG), With<MassG>>,
+    mut crafts_mut: Query<
+        (&mut NBodyAcceleration, &Transform),
+        (With<NBodyEffector>, Without<MassG>),
+    >,
+    mut planets_mut: Query<(Entity, &mut NBodyAcceleration, &Transform, &MassG), With<MassG>>,
 ) {
+    //info!("nbody_accelerate");
     fn gravity_acc(own_pos: DVec3, other_pos: DVec3, other_mass: f64) -> DVec3 {
         let dist_vec = other_pos - own_pos;
         let dist = dist_vec.length();
