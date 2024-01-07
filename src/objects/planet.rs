@@ -36,6 +36,8 @@ use crate::{
     },
 };
 
+use super::components::FocusType;
+
 pub struct SpawnPlanetsPlugin;
 impl Plugin for SpawnPlanetsPlugin {
     fn build(&self, app: &mut App) {
@@ -151,6 +153,7 @@ impl PlanetBundle {
             focusable: Focusable {
                 focus_min_distance: radius * 1.006,
                 focus_sphere_radius: radius,
+                focus_type: FocusType::Fixed,
             },
             transform: Transform {
                 translation: position.as_vec3(),
@@ -188,8 +191,6 @@ fn rotate_planets(
         planet.spin_position += planet.spin_velocity * speed;
         let over = (planet.spin_position / (2.0 * PI)).floor();
         planet.spin_position -= planet.spin_position * over;
-
-        info!(planet.spin_position);
 
         let tilt = Quat::from_rotation_x(planet.axial_tilt as f32);
         let spin = Quat::from_rotation_z(planet.spin_position as f32);

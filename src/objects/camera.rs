@@ -14,12 +14,14 @@ use bevy::{
 use crate::{
     floatingorigin::{components::FloatingOriginPosition, systemsets::FloatingOriginSet},
     objects::{
-        components::{FocusTarget, Focusable},
+        components::{FocusTarget, FocusType, Focusable},
         planet::Planet,
         systemsets::{CameraSets, ObjectSets},
     },
     physics::systemsets::PhysicsSet,
 };
+
+use super::components::CraftLabel;
 
 pub struct SpawnCameraPlugin;
 
@@ -95,22 +97,21 @@ fn change_camera_focus(
     focus: Query<
         (
             Entity,
+            Option<&Children>,
             &GlobalTransform,
             &Focusable,
             &FloatingOriginPosition,
         ),
         With<Focusable>,
     >,
-    mut camera_q: Query<
-        (
-            &GlobalTransform,
-            &Camera,
-            &mut Transform,
-            &mut FocusTarget,
-            &FloatingOriginPosition,
-        ),
-        With<Camera3d>,
-    >,
+    mut camera_q: Query<(
+        &GlobalTransform,
+        &Camera,
+        &mut Transform,
+        &mut FocusTarget,
+        &FloatingOriginPosition,
+    )>,
+    labels: Query<&Transform, (With<CraftLabel>, Without<Focusable>, Without<Camera>)>,
 ) {
     if input_mouse.just_released(MouseButton::Left) {
         info!("Checking for new focus for camera");
@@ -122,7 +123,17 @@ fn change_camera_focus(
         let mut closest_distance = f32::MAX;
         let mut closest_transform = GlobalTransform::IDENTITY;
         let mut closest_origin = DVec3::ZERO;
-        for (entity_id, focus_transform, focus_foc, target_origin) in focus.iter() {
+        for (entity_id, children, focus_transform, focus_foc, target_origin) in focus.iter() {
+            let mut focus_sphere_radius_scaled = 0.0;
+            if focus_foc.focus_type == FocusType::Fixed {
+                focus_sphere_radius_scaled = focus_foc.focus_sphere_radius;
+            } else if focus_foc.focus_type == FocusType::Scale {
+                let label = labels
+                    .get(*children.expect("").first().expect(""))
+                    .expect("");
+                focus_sphere_radius_scaled = focus_foc.focus_sphere_radius * label.scale.x as f64;
+            }
+
             //info!("Test for intersection with {:?}", entity_id);
             let ray = camera
                 .viewport_to_world(camera_transform, window.cursor_position().expect(""))
@@ -133,8 +144,7 @@ fn change_camera_focus(
             // Compute intersection
             let m = ray.origin - focus_transform.translation();
             let b = m.dot(ray.direction);
-            let c =
-                m.dot(m) - (focus_foc.focus_sphere_radius * focus_foc.focus_sphere_radius) as f32;
+            let c = m.dot(m) - (focus_sphere_radius_scaled * focus_sphere_radius_scaled) as f32;
 
             // Exit if r’s origin outside s (c > 0) and r pointing away from s (b > 0)
             if c > 0.0 && b > 0.0 {

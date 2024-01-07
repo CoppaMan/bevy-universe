@@ -36,7 +36,7 @@ use crate::{
     },
 };
 
-use super::components::{Craft, CraftLabel};
+use super::components::{Craft, CraftLabel, FocusType};
 
 #[derive(Bundle)]
 struct CraftBundle {
@@ -109,9 +109,7 @@ fn spawn_crafts(
         commands.spawn((
             MaterialMeshBundle {
                 mesh: line_mesh,
-                material: materials_line.add(LineMaterial {
-                    color: Color::LIME_GREEN,
-                }),
+                material: materials_line.add(LineMaterial { color: Color::GRAY }),
                 ..Default::default()
             },
             OrbitHistoryMesh {
@@ -139,7 +137,8 @@ impl CraftBundle {
             acceleration: NBodyAcceleration(DVec3::ZERO),
             focusable: Focusable {
                 focus_min_distance: 1000.,
-                focus_sphere_radius: 100000.,
+                focus_sphere_radius: 0.5,
+                focus_type: FocusType::Scale,
             },
             spatial: SpatialBundle {
                 transform: Transform::from_translation(position.as_vec3()),

@@ -3,11 +3,17 @@ use bevy::{
     math::DVec3,
 };
 
-///
+#[derive(Eq, PartialEq, Hash)]
+pub enum FocusType {
+    Fixed,
+    Scale,
+}
+
 #[derive(Component)]
 pub struct Focusable {
     pub focus_min_distance: f64,
     pub focus_sphere_radius: f64,
+    pub focus_type: FocusType,
 }
 
 #[derive(Component)]
