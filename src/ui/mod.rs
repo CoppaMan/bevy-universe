@@ -2,7 +2,10 @@ use bevy::app::{PluginGroup, PluginGroupBuilder};
 
 use simspeed::UiSimSpeedPlugin;
 
+mod button;
+mod container;
 mod simspeed;
+mod window;
 
 pub struct UiPlugins;
 

@@ -7,17 +7,14 @@ use bevy::{
         system::{Commands, Query, Res, ResMut},
     },
     log::info,
-    prelude::BuildChildren,
-    render::color::Color,
     text::Text,
     text::TextStyle,
-    ui::{
-        node_bundles::{ButtonBundle, NodeBundle, TextBundle},
-        AlignItems, FlexDirection, Interaction, JustifyContent, Style, UiRect, Val,
-    },
+    ui::{node_bundles::TextBundle, FlexDirection, Interaction, Style, UiRect, Val},
 };
 
 use crate::physics::resources::PhysicsTimeScale;
+
+use super::{button::UiButtonBuilder, container::UiContainerBuilder, window::UiWindowBuilder};
 
 #[derive(Component)]
 struct SimSpeedChange(u16);
@@ -35,54 +32,32 @@ impl Plugin for UiSimSpeedPlugin {
 }
 
 pub fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let frame = commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Px(200.),
-                flex_direction: FlexDirection::Column,
-                padding: UiRect::all(Val::Px(3.)),
-                ..Default::default()
-            },
-            background_color: Color::rgb_u8(191, 113, 17).into(),
-            ..Default::default()
-        })
-        .id();
+    let button_1 = UiButtonBuilder::build(
+        &mut commands,
+        &asset_server,
+        SimSpeedChange(1),
+        "+1x".into(),
+    );
 
-    let window_title = commands
-        .spawn(
-            TextBundle::from_section(
-                "Simulation speed",
-                TextStyle {
-                    font: asset_server.load("fonts/Consolas.ttf"),
-                    font_size: 15.0,
-                    ..Default::default()
-                },
-            )
-            .with_style(Style {
-                margin: UiRect::all(Val::Px(3.)),
-                ..Default::default()
-            }),
-        )
-        .id();
+    let button_10 = UiButtonBuilder::build(
+        &mut commands,
+        &asset_server,
+        SimSpeedChange(10),
+        "+10x".into(),
+    );
 
-    let content = commands
-        .spawn(NodeBundle {
-            style: Style {
-                flex_grow: 2.,
-                flex_direction: FlexDirection::Row,
-                justify_content: JustifyContent::SpaceBetween,
-                align_items: AlignItems::FlexStart,
-                padding: UiRect::all(Val::Px(5.0)),
-                ..Default::default()
-            },
-            background_color: Color::rgb(0.15, 0.15, 0.15).into(),
-            ..Default::default()
-        })
-        .id();
+    let button_100 = UiButtonBuilder::build(
+        &mut commands,
+        &asset_server,
+        SimSpeedChange(100),
+        "+100x".into(),
+    );
 
-    commands
-        .entity(frame)
-        .push_children(&[window_title, content]);
+    let button_container = UiContainerBuilder::build(
+        &mut commands,
+        FlexDirection::Row,
+        &[button_1, button_10, button_100],
+    );
 
     let speed = commands
         .spawn((
@@ -102,119 +77,18 @@ pub fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         ))
         .id();
 
-    let buttons = commands
-        .spawn(NodeBundle {
-            style: Style {
-                flex_direction: FlexDirection::Row,
-                ..Default::default()
-            },
-            background_color: Color::rgb(0.05, 0.05, 0.05).into(),
-            ..Default::default()
-        })
-        .id();
+    let container = UiContainerBuilder::build(
+        &mut commands,
+        FlexDirection::Row,
+        &[speed, button_container],
+    );
 
-    commands.entity(content).push_children(&[speed, buttons]);
-
-    let one_times = commands
-        .spawn((
-            ButtonBundle {
-                style: Style {
-                    width: Val::Px(40.0),
-                    height: Val::Px(20.0),
-                    // horizontally center child text
-                    justify_content: JustifyContent::Center,
-                    // vertically center child text
-                    margin: UiRect::right(Val::Px(5.)),
-                    align_items: AlignItems::Center,
-                    ..Default::default()
-                },
-                background_color: Color::rgb(0.5, 0.5, 0.5).into(),
-                ..Default::default()
-            },
-            SimSpeedChange(1),
-        ))
-        .id();
-
-    let one_times_text = commands
-        .spawn(TextBundle::from_section(
-            "+1x",
-            TextStyle {
-                font: asset_server.load("fonts/Consolas.ttf"),
-                font_size: 15.0,
-                ..Default::default()
-            },
-        ))
-        .id();
-    commands.entity(one_times).push_children(&[one_times_text]);
-
-    let ten_times = commands
-        .spawn((
-            ButtonBundle {
-                style: Style {
-                    width: Val::Px(40.0),
-                    height: Val::Px(20.0),
-                    // horizontally center child text
-                    justify_content: JustifyContent::Center,
-                    // vertically center child text
-                    margin: UiRect::right(Val::Px(5.)),
-                    align_items: AlignItems::Center,
-                    ..Default::default()
-                },
-                background_color: Color::rgb(0.5, 0.5, 0.5).into(),
-                ..Default::default()
-            },
-            SimSpeedChange(10),
-        ))
-        .id();
-
-    let ten_times_text = commands
-        .spawn(TextBundle::from_section(
-            "+10x",
-            TextStyle {
-                font: asset_server.load("fonts/Consolas.ttf"),
-                font_size: 15.0,
-                ..Default::default()
-            },
-        ))
-        .id();
-    commands.entity(ten_times).push_children(&[ten_times_text]);
-
-    let hundred_times = commands
-        .spawn((
-            ButtonBundle {
-                style: Style {
-                    width: Val::Px(40.0),
-                    height: Val::Px(20.0),
-                    // horizontally center child text
-                    justify_content: JustifyContent::Center,
-                    // vertically center child text
-                    align_items: AlignItems::Center,
-                    ..Default::default()
-                },
-                background_color: Color::rgb(0.5, 0.5, 0.5).into(),
-                ..Default::default()
-            },
-            SimSpeedChange(100),
-        ))
-        .id();
-
-    let hundred_times_text = commands
-        .spawn(TextBundle::from_section(
-            "+100x",
-            TextStyle {
-                font: asset_server.load("fonts/Consolas.ttf"),
-                font_size: 15.0,
-                ..Default::default()
-            },
-        ))
-        .id();
-    commands
-        .entity(hundred_times)
-        .push_children(&[hundred_times_text]);
-
-    commands
-        .entity(buttons)
-        .push_children(&[one_times, ten_times, hundred_times]);
+    UiWindowBuilder::build(
+        &mut commands,
+        &asset_server,
+        "Simulation speed".into(),
+        container,
+    );
 }
 
 fn change_speed(
