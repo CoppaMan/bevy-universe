@@ -4,8 +4,10 @@ use bevy::{
     asset::AssetServer,
     ecs::{
         bundle::Bundle,
+        component::Component,
         entity::Entity,
-        system::{Commands, Res},
+        query::With,
+        system::{Commands, Query, Res, ResMut},
     },
     hierarchy::BuildChildren,
     math::Vec2,
@@ -13,9 +15,11 @@ use bevy::{
     text::TextStyle,
     ui::{
         node_bundles::{ButtonBundle, TextBundle},
-        AlignItems, JustifyContent, Style, Val,
+        AlignItems, Interaction, JustifyContent, Style, Val,
     },
 };
+
+use super::resources::UiClicked;
 
 pub struct UiButtonStyle {
     pub button_background_color: Color,
@@ -29,6 +33,9 @@ impl Default for UiButtonStyle {
         }
     }
 }
+
+#[derive(Component)]
+pub struct UiButton;
 
 pub struct UiButtonBuilder<BundleTrait> {
     phantom: PhantomData<BundleTrait>,
@@ -66,6 +73,7 @@ where
                     ..Default::default()
                 },
                 action,
+                UiButton,
             ))
             .id();
 
@@ -83,4 +91,24 @@ where
 
         button
     }
+}
+
+pub fn set_button_ui_click(
+    interaction_query: Query<&Interaction, With<UiButton>>,
+    mut clicked: ResMut<UiClicked>,
+) {
+    if clicked.0 {
+        return;
+    }
+
+    for interaction in interaction_query.iter() {
+        match *interaction {
+            Interaction::Pressed | Interaction::Hovered => {
+                clicked.0 = true;
+                return;
+            }
+            _ => {}
+        }
+    }
+    clicked.0 = false;
 }

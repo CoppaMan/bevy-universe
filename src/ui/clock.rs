@@ -15,6 +15,10 @@ use crate::physics::resources::{PhysicsStepScale, PhysicsTimeScale};
 
 use super::{container::UiContainerBuilder, window::UiWindowBuilder};
 
+const SEC_PER_DAY: f64 = 86400.0;
+const SEC_PER_HOUR: f64 = 3600.0;
+const SEC_PER_MIN: f64 = 60.0;
+
 #[derive(Component)]
 struct SimSpeedChange(u16);
 
@@ -54,7 +58,7 @@ pub fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
     UiWindowBuilder::build(
         &mut commands,
         &asset_server,
-        "Simulation speed".into(),
+        "Clock".into(),
         container,
         (10.0, 300.0),
     );
@@ -69,5 +73,18 @@ fn update_time(
     let time_passed = time.delta_seconds_f64() * (speed_scale.0 * step_scale.0) as f64;
     let (mut clock, mut text) = display.get_single_mut().expect("");
     clock.0 += time_passed;
-    text.sections[0].value = clock.0.to_string() + "s";
+
+    let mut secs = clock.0;
+    let days = (secs / SEC_PER_DAY).floor();
+    secs -= days * SEC_PER_DAY;
+
+    let hours = (secs / SEC_PER_HOUR).floor();
+    secs -= hours * SEC_PER_HOUR;
+
+    let mins = (secs / SEC_PER_MIN).floor();
+    secs -= mins * SEC_PER_MIN;
+
+    secs = secs.floor();
+
+    text.sections[0].value = format!("{days}:{hours}:{mins}:{secs}");
 }

@@ -1,15 +1,12 @@
 use bevy::{
-    app::{App, Plugin, Update},
     asset::AssetServer,
     ecs::{
         component::Component,
         entity::Entity,
         query::{Changed, With},
-        schedule::IntoSystemConfigs,
         system::{Commands, Query, Res, ResMut},
     },
     hierarchy::{BuildChildren, Parent},
-    log::info,
     math::Vec2,
     render::color::Color,
     text::TextStyle,
@@ -20,25 +17,10 @@ use bevy::{
     window::{PrimaryWindow, Window},
 };
 
-use crate::objects::systemsets::CameraSets;
-
 use super::{
     button::{UiButtonBuilder, UiButtonStyle},
     resources::UiClicked,
-    systemsets::UiSets,
 };
-
-pub struct UiWindowPlugin;
-impl Plugin for UiWindowPlugin {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(UiClicked(false)).add_systems(
-            Update,
-            (move_window, set_ui_click)
-                .in_set(UiSets::UiAll)
-                .before(CameraSets::CameraAll),
-        );
-    }
-}
 
 #[derive(Component)]
 pub struct UiWindowFrame {
@@ -149,28 +131,27 @@ impl UiWindowBuilder {
     }
 }
 
-fn set_ui_click(
+pub fn set_window_ui_click(
     interaction_query: Query<&Interaction, With<UiWindowFrame>>,
     mut clicked: ResMut<UiClicked>,
 ) {
+    if clicked.0 {
+        return;
+    }
+
     for interaction in interaction_query.iter() {
-        info!("Interaction: {:?}", interaction);
         match *interaction {
-            Interaction::Pressed => {
+            Interaction::Pressed | Interaction::Hovered => {
                 clicked.0 = true;
                 return;
             }
-            Interaction::Hovered => {
-                clicked.0 = true;
-                return;
-            }
-            Interaction::None => {}
+            _ => {}
         }
     }
     clicked.0 = false;
 }
 
-fn move_window(
+pub fn move_window(
     mut interaction_query: Query<(&Parent, &Interaction), With<UiWindowHeader>>,
     mut interaction_changed: Query<
         (&Parent, &Interaction),
@@ -190,8 +171,7 @@ fn move_window(
                     win.move_offset = Vec2::new(position.x - left, position.y - top);
                 }
             }
-            Interaction::Hovered => {}
-            Interaction::None => {}
+            _ => {}
         }
     }
 
@@ -205,8 +185,7 @@ fn move_window(
                     frame.top = Val::Px(position.y - win.move_offset.y);
                 }
             }
-            Interaction::Hovered => {}
-            Interaction::None => {}
+            _ => {}
         }
     }
 }
