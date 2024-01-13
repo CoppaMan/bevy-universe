@@ -14,7 +14,11 @@ use bevy::{
 
 use crate::physics::resources::PhysicsTimeScale;
 
-use super::{button::UiButtonBuilder, container::UiContainerBuilder, window::UiWindowBuilder};
+use super::{
+    button::{UiButtonBuilder, UiButtonStyle},
+    container::UiContainerBuilder,
+    window::UiWindowBuilder,
+};
 
 #[derive(Component)]
 struct SimSpeedChange(u16);
@@ -37,6 +41,7 @@ pub fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         &asset_server,
         SimSpeedChange(1),
         "+1x".into(),
+        UiButtonStyle::default(),
     );
 
     let button_10 = UiButtonBuilder::build(
@@ -44,6 +49,7 @@ pub fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         &asset_server,
         SimSpeedChange(10),
         "+10x".into(),
+        UiButtonStyle::default(),
     );
 
     let button_100 = UiButtonBuilder::build(
@@ -51,6 +57,7 @@ pub fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         &asset_server,
         SimSpeedChange(100),
         "+100x".into(),
+        UiButtonStyle::default(),
     );
 
     let button_container = UiContainerBuilder::build(
@@ -88,6 +95,7 @@ pub fn build_ui(mut commands: Commands, asset_server: Res<AssetServer>) {
         &asset_server,
         "Simulation speed".into(),
         container,
+        (10.0, 10.0),
     );
 }
 

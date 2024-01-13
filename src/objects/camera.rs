@@ -19,6 +19,7 @@ use crate::{
         systemsets::{CameraSets, ObjectSets},
     },
     physics::systemsets::PhysicsSet,
+    ui::resources::UiClicked,
 };
 
 use super::components::CraftLabel;
@@ -51,7 +52,7 @@ impl Plugin for SpawnCameraPlugin {
 
 fn spawn_camera(mut commands: Commands, planets: Query<Entity, With<Planet>>) {
     info!("Spawning camera");
-    let camera_start_pos = DVec3::new(-100000000.0, 0.0, 0.0);
+    let camera_start_pos = DVec3::new(-20000000.0, 0.0, 0.0);
 
     // Focus on first parent
     let mut focus = Entity::PLACEHOLDER;
@@ -92,6 +93,7 @@ fn track_camera_focus(
 }
 
 fn change_camera_focus(
+    clicked: Res<UiClicked>,
     win_q: Query<&Window>,
     input_mouse: Res<Input<MouseButton>>,
     focus: Query<
@@ -113,6 +115,10 @@ fn change_camera_focus(
     )>,
     labels: Query<&Transform, (With<CraftLabel>, Without<Focusable>, Without<Camera>)>,
 ) {
+    if clicked.0 {
+        return;
+    }
+
     if input_mouse.just_released(MouseButton::Left) {
         info!("Checking for new focus for camera");
         let window = win_q.get_single().expect("");
@@ -198,6 +204,7 @@ fn change_camera_focus(
 }
 
 fn pan_orbit_camera(
+    clicked: Res<UiClicked>,
     win_q: Query<&Window>,
     mut ev_motion: EventReader<MouseMotion>,
     mut ev_scroll: EventReader<MouseWheel>,
@@ -212,6 +219,9 @@ fn pan_orbit_camera(
     >,
     focusable_q: Query<(&Focusable, &FloatingOriginPosition), Without<Camera>>,
 ) {
+    if clicked.0 {
+        return;
+    }
     //info!("pan_orbit_camera");
 
     // change input mapping for orbit and panning here
