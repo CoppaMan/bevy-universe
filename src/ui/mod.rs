@@ -15,7 +15,7 @@ use self::{
     clock::UiClockPlugin,
     resources::UiClicked,
     systemsets::UiSets,
-    window::{move_window, set_window_ui_click},
+    window::{move_window, set_window_ui_click, toggle_hide_window},
 };
 
 pub mod resources;
@@ -37,6 +37,7 @@ impl Plugin for UiPlugin {
                 (
                     null_clicked,
                     (set_window_ui_click, set_button_ui_click, move_window),
+                    toggle_hide_window,
                 )
                     .chain()
                     .in_set(UiSets::UiAll),

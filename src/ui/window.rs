@@ -12,7 +12,7 @@ use bevy::{
     text::TextStyle,
     ui::{
         node_bundles::{NodeBundle, TextBundle},
-        AlignItems, FlexDirection, Interaction, JustifyContent, Style, UiRect, Val,
+        AlignItems, Display, FlexDirection, Interaction, JustifyContent, Style, UiRect, Val,
     },
     window::{PrimaryWindow, Window},
 };
@@ -31,7 +31,12 @@ pub struct UiWindowFrame {
 pub struct UiWindowHeader;
 
 #[derive(Component)]
-pub struct HideUiWindow;
+pub struct UiWindowContent;
+
+#[derive(Component)]
+pub struct ToggleUiWindow {
+    content: Entity,
+}
 
 pub struct UiWindowBuilder;
 impl UiWindowBuilder {
@@ -42,18 +47,6 @@ impl UiWindowBuilder {
         content: Entity,
         start: (f32, f32),
     ) -> Entity {
-        let hide_button = UiButtonBuilder::build(
-            commands,
-            asset_server,
-            HideUiWindow,
-            "_".into(),
-            UiButtonStyle {
-                fixed_size: Some(Vec2::new(20.0, 20.0)),
-                button_background_color: Color::DARK_GRAY,
-                ..Default::default()
-            },
-        );
-
         let mut header = Entity::PLACEHOLDER;
         let mut content_holder = Entity::PLACEHOLDER;
         let frame = commands
@@ -107,22 +100,39 @@ impl UiWindowBuilder {
                     })
                     .id();
                 content_holder = frame_parent
-                    .spawn(NodeBundle {
-                        style: Style {
-                            margin: UiRect::new(
-                                Val::Px(2.0),
-                                Val::Px(2.0),
-                                Val::Px(0.0),
-                                Val::Px(2.0),
-                            ),
+                    .spawn((
+                        NodeBundle {
+                            style: Style {
+                                margin: UiRect::new(
+                                    Val::Px(2.0),
+                                    Val::Px(2.0),
+                                    Val::Px(0.0),
+                                    Val::Px(2.0),
+                                ),
+                                ..Default::default()
+                            },
+                            background_color: Color::rgb_u8(0, 113, 17).into(),
                             ..Default::default()
                         },
-                        background_color: Color::rgb_u8(0, 113, 17).into(),
-                        ..Default::default()
-                    })
+                        UiWindowContent,
+                    ))
                     .id();
             })
             .id();
+
+        let hide_button = UiButtonBuilder::build(
+            commands,
+            asset_server,
+            ToggleUiWindow {
+                content: content_holder,
+            },
+            "_".into(),
+            UiButtonStyle {
+                fixed_size: Some(Vec2::new(20.0, 20.0)),
+                button_background_color: Color::DARK_GRAY,
+                ..Default::default()
+            },
+        );
 
         commands.entity(header).push_children(&[hide_button]);
         commands.entity(content_holder).push_children(&[content]);
@@ -186,6 +196,32 @@ pub fn move_window(
                 }
             }
             _ => {}
+        }
+    }
+}
+
+pub fn toggle_hide_window(
+    interaction_query: Query<
+        (&Interaction, &ToggleUiWindow),
+        (Changed<Interaction>, With<ToggleUiWindow>),
+    >,
+    mut windows_content: Query<&mut Style, With<UiWindowContent>>,
+) {
+    for (interaction, hide_window) in interaction_query.iter() {
+        let mut window_entity: Entity = Entity::PLACEHOLDER;
+        match *interaction {
+            Interaction::Pressed => {
+                window_entity = hide_window.content;
+            }
+            _ => {
+                continue;
+            }
+        }
+        let mut content = windows_content.get_mut(window_entity).expect("");
+        if content.display == Display::None {
+            content.display = Display::Flex;
+        } else {
+            content.display = Display::None;
         }
     }
 }
