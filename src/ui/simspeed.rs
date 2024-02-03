@@ -115,8 +115,7 @@ fn change_speed(
                 display.get_single_mut().expect("").sections[0].value =
                     speed_scale.0.to_string() + "x";
             }
-            Interaction::Hovered => {}
-            Interaction::None => {}
+            _ => {}
         }
     }
 }

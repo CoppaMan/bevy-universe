@@ -208,15 +208,12 @@ pub fn toggle_hide_window(
     mut windows_content: Query<&mut Style, With<UiWindowContent>>,
 ) {
     for (interaction, hide_window) in interaction_query.iter() {
-        let mut window_entity: Entity = Entity::PLACEHOLDER;
-        match *interaction {
-            Interaction::Pressed => {
-                window_entity = hide_window.content;
-            }
+        let window_entity = match *interaction {
+            Interaction::Pressed => hide_window.content,
             _ => {
                 continue;
             }
-        }
+        };
         let mut content = windows_content.get_mut(window_entity).expect("");
         if content.display == Display::None {
             content.display = Display::Flex;
