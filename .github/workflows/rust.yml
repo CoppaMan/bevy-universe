@@ -16,7 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Alsa deps
+      run: sudo apt-get install -y libasound2-dev portaudio19-dev build-essential libpulse-dev libdbus-1-dev
+    - name: LibU deps
+      run: sudo apt install -y libudev-dev pkg-config
     - name: Build
-      run: >
-        sudo apt-get install -y libasound2-dev portaudio19-dev build-essential libpulse-dev libdbus-1-dev;
-        cargo build --release --verbose
+      run: cargo build --release --verbose
