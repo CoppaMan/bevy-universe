@@ -1,7 +1,7 @@
 use bevy::{
     asset::{Asset, AssetId},
-    ecs::{component::Component, entity::Entity},
-    math::Vec3,
+    ecs::component::Component,
+    math::{DVec3, Vec3},
     pbr::{Material, MaterialPipeline, MaterialPipelineKey},
     reflect::TypePath,
     render::{
@@ -17,7 +17,7 @@ use bevy::{
 #[derive(Component)]
 pub struct OrbitHistoryMesh {
     pub orbit_mesh: AssetId<Mesh>,
-    pub craft: Entity,
+    pub history: Vec<DVec3>,
 }
 
 /// Material used for the line segments

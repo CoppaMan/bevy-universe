@@ -13,6 +13,7 @@ use crate::objects::systemsets::CameraSets;
 use self::{
     button::set_button_ui_click,
     clock::UiClockPlugin,
+    referenceframe::UiReferenceFramePlugin,
     resources::UiClicked,
     systemsets::UiSets,
     window::{move_window, set_window_ui_click, toggle_hide_window},
@@ -24,6 +25,7 @@ pub mod systemsets;
 mod button;
 mod clock;
 mod container;
+mod referenceframe;
 mod simspeed;
 mod window;
 
@@ -31,7 +33,7 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(UiClicked(false))
-            .configure_sets(Update, UiSets::UiAll.before(CameraSets::CameraAll))
+            .configure_sets(Update, UiSets::UiUpdateAll.before(CameraSets::CameraAll))
             .add_systems(
                 Update,
                 (
@@ -40,7 +42,7 @@ impl Plugin for UiPlugin {
                     toggle_hide_window,
                 )
                     .chain()
-                    .in_set(UiSets::UiAll),
+                    .in_set(UiSets::UiUpdateAll),
             );
     }
 }
@@ -52,6 +54,7 @@ impl PluginGroup for UiPlugins {
             .add(UiPlugin)
             .add(UiSimSpeedPlugin)
             .add(UiClockPlugin)
+            .add(UiReferenceFramePlugin)
     }
 }
 

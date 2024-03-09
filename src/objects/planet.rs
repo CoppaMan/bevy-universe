@@ -21,15 +21,21 @@ use {
 
 use std::f64::consts::PI;
 
-use bevy::{app::Update, ecs::system::Query, time::Time};
+use bevy::{
+    app::Update,
+    ecs::{entity::Entity, system::Query},
+    time::Time,
+};
 
 use crate::{
     floatingorigin::components::FloatingOriginPosition,
     objects::{components::Focusable, systemsets::ObjectSets},
+    orbits::history::{OrbitHistoryBundle, OrbitHistoryEntity},
     physics::{
         components::{MassG, NBodyAcceleration, NBodyEffector, NBodyVelocity},
         resources::{PhysicsStepScale, PhysicsTimeScale},
     },
+    renderer::line::LineMaterial,
     utils::{
         self,
         data::{get_data_dir, DataDir},
@@ -56,6 +62,7 @@ fn spawn_planets(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut materials_line: ResMut<Assets<LineMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
     let proj_dir = get_data_dir(DataDir::Planets);
@@ -87,7 +94,8 @@ fn spawn_planets(
             ..Default::default()
         });
 
-        commands
+        let hist_id = OrbitHistoryBundle::spawn(&mut commands, &mut meshes, &mut materials_line);
+        let _ = commands
             .spawn(PbrBundle {
                 mesh: mesh_handle,
                 material: material_handle,
@@ -96,7 +104,10 @@ fn spawn_planets(
                 )),
                 ..Default::default()
             })
-            .insert(PlanetBundle::from_parser(&parser));
+            .insert(OrbitHistoryEntity(hist_id))
+            .insert(PlanetBundle::from_parser(parser, hist_id))
+            .id();
+
         info!(
             "Spawned planet {}",
             planet_file_path.as_os_str().to_str().expect("")
@@ -109,10 +120,12 @@ pub struct Planet {
     pub axial_tilt: f64,
     pub spin_velocity: f64,
     pub spin_position: f64,
+    pub name: String,
 }
 
 #[derive(Serialize, Deserialize)]
 struct PlanetParser {
+    name: String,
     position: Vec<f64>,
     velocity: Vec<f64>,
     mass: f64,
@@ -122,7 +135,6 @@ struct PlanetParser {
 }
 
 #[derive(Bundle)]
-
 struct PlanetBundle {
     entity_type: Planet,
     nbody: NBodyEffector,
@@ -132,19 +144,23 @@ struct PlanetBundle {
     velocity: NBodyVelocity,
     acceleration: NBodyAcceleration,
     mass_g: MassG,
+    orbit_history: OrbitHistoryEntity,
 }
 
 impl PlanetBundle {
     fn new(
+        name: String,
         position: DVec3,
         velocity: DVec3,
         mass: f64,
         radius: f64,
         axial_tilt: f64,
         angular_velocity: f64,
+        orbit_history: Entity,
     ) -> Self {
         Self {
             entity_type: Planet {
+                name: name,
                 axial_tilt: axial_tilt,
                 spin_velocity: angular_velocity,
                 spin_position: 0.0,
@@ -164,17 +180,20 @@ impl PlanetBundle {
             velocity: NBodyVelocity(velocity),
             acceleration: NBodyAcceleration(DVec3::ZERO),
             mass_g: MassG(mass * NEWTONIAN_CONSTANT_OF_GRAVITATION),
+            orbit_history: OrbitHistoryEntity(orbit_history),
         }
     }
 
-    fn from_parser(parser: &PlanetParser) -> Self {
+    fn from_parser(parser: PlanetParser, orbit_history: Entity) -> Self {
         PlanetBundle::new(
+            parser.name,
             utils::vectors::vec_to_dvec3(&parser.position),
             utils::vectors::vec_to_dvec3(&parser.velocity),
             parser.mass,
             parser.radius,
             parser.axial_tilt,
             parser.angular_velocity,
+            orbit_history,
         )
     }
 }

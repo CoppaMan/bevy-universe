@@ -1,3 +1,5 @@
+use bevy::ecs::entity::Entity;
+
 use {
     bevy::{
         app::{App, Plugin, Startup, Update},
@@ -12,12 +14,10 @@ use {
         hierarchy::BuildChildren,
         log::info,
         math::{DVec3, Vec2, Vec3},
-        pbr::{AlphaMode, MaterialMeshBundle, PbrBundle, StandardMaterial},
+        pbr::{AlphaMode, PbrBundle, StandardMaterial},
         render::{
-            color::Color,
             mesh::{shape::Quad, Mesh},
             prelude::SpatialBundle,
-            view::NoFrustumCulling,
         },
         transform::components::{GlobalTransform, Transform},
     },
@@ -28,8 +28,9 @@ use {
 use crate::{
     floatingorigin::components::FloatingOriginPosition,
     objects::{components::Focusable, systemsets::ObjectSets},
+    orbits::history::{OrbitHistoryBundle, OrbitHistoryEntity},
     physics::components::{NBodyAcceleration, NBodyEffector, NBodyVelocity},
-    renderer::line::{LineMaterial, LineStrip, OrbitHistoryMesh},
+    renderer::line::LineMaterial,
     utils::{
         self,
         data::{get_data_dir, DataDir},
@@ -46,8 +47,7 @@ struct CraftBundle {
     velocity: NBodyVelocity,
     acceleration: NBodyAcceleration,
     focusable: Focusable,
-
-    #[bundle()]
+    orbit_history: OrbitHistoryEntity,
     spatial: SpatialBundle,
 }
 
@@ -97,28 +97,13 @@ fn spawn_crafts(
             ..Default::default()
         });
 
-        let line_mesh = meshes.add(Mesh::from(LineStrip { points: vec![] }));
-
-        let mesh_id = line_mesh.id();
-        let craft_id = commands
-            .spawn(CraftBundle::from_json(&craft_string))
+        let hist_id = OrbitHistoryBundle::spawn(&mut commands, &mut meshes, &mut materials_line);
+        let _ = commands
+            .spawn(CraftBundle::from_json(&craft_string, hist_id))
             .with_children(|parent| {
                 parent.spawn(CraftLabelBundle::new(quad_handle, material_handle));
             })
             .id();
-        commands.spawn((
-            MaterialMeshBundle {
-                mesh: line_mesh,
-                material: materials_line.add(LineMaterial { color: Color::GRAY }),
-                ..Default::default()
-            },
-            OrbitHistoryMesh {
-                orbit_mesh: mesh_id,
-                craft: craft_id,
-            },
-            FloatingOriginPosition(DVec3::ZERO),
-            NoFrustumCulling,
-        ));
 
         info!(
             "Spawned craft {}",
@@ -128,7 +113,7 @@ fn spawn_crafts(
 }
 
 impl CraftBundle {
-    fn new(position: DVec3, velocity: DVec3) -> Self {
+    fn new(position: DVec3, velocity: DVec3, orbit_history: Entity) -> Self {
         Self {
             nbody: NBodyEffector,
             entity_type: Craft,
@@ -140,6 +125,7 @@ impl CraftBundle {
                 focus_sphere_radius: 0.5,
                 focus_type: FocusType::Scale,
             },
+            orbit_history: OrbitHistoryEntity(orbit_history),
             spatial: SpatialBundle {
                 transform: Transform::from_translation(position.as_vec3()),
                 ..Default::default()
@@ -147,12 +133,13 @@ impl CraftBundle {
         }
     }
 
-    fn from_json(data: &str) -> Self {
+    fn from_json(data: &str, orbit_history: Entity) -> Self {
         let c: CraftParser = serde_json::from_str(data).expect("");
 
         CraftBundle::new(
             utils::vectors::vec_to_dvec3(&c.position),
             utils::vectors::vec_to_dvec3(&c.velocity),
+            orbit_history,
         )
     }
 }

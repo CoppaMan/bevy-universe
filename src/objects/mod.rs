@@ -1,9 +1,10 @@
 pub mod components;
 pub mod systemsets;
 
+pub mod planet;
+
 mod camera;
 mod craft;
-mod planet;
 
 use bevy::app::{PluginGroup, PluginGroupBuilder};
 

@@ -5,7 +5,7 @@ use self::history::OrbitHistoryPlugin;
 pub mod components;
 pub mod systemsets;
 
-mod history;
+pub mod history;
 
 pub struct OrbitsPlugins;
 impl PluginGroup for OrbitsPlugins {
