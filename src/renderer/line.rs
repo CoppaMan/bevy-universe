@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bevy::{
     asset::{Asset, AssetId},
     ecs::component::Component,
@@ -17,7 +19,7 @@ use bevy::{
 #[derive(Component)]
 pub struct OrbitHistoryMesh {
     pub orbit_mesh: AssetId<Mesh>,
-    pub history: Vec<DVec3>,
+    pub history: VecDeque<DVec3>,
 }
 
 /// Material used for the line segments

@@ -18,7 +18,7 @@ use crate::{
 };
 
 use super::{
-    super::objects::planet::Planet,
+    super::objects::planet::components::Planet,
     button::{UiButtonBuilder, UiButtonStyle},
     container::UiContainerBuilder,
     systemsets::UiSets,

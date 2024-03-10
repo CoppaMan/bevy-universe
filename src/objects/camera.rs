@@ -15,7 +15,7 @@ use crate::{
     floatingorigin::{components::FloatingOriginPosition, systemsets::FloatingOriginSet},
     objects::{
         components::{FocusTarget, FocusType, Focusable},
-        planet::Planet,
+        planet::components::Planet,
         systemsets::{CameraSets, ObjectSets},
     },
     physics::systemsets::PhysicsSet,

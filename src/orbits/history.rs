@@ -1,5 +1,7 @@
+use std::collections::VecDeque;
+
 use bevy::{
-    app::{App, Plugin, Update},
+    app::{App, FixedUpdate, Plugin},
     asset::Assets,
     ecs::{
         bundle::Bundle,
@@ -12,6 +14,7 @@ use bevy::{
     math::{DVec3, Vec3},
     pbr::MaterialMeshBundle,
     render::{color::Color, mesh::Mesh, view::NoFrustumCulling},
+    time::{Fixed, Time},
 };
 
 use crate::{
@@ -24,6 +27,15 @@ use crate::{
 #[derive(Resource)]
 pub struct SelectedReferenceFrame {
     pub target: Entity,
+}
+
+#[derive(Resource)]
+pub struct OrbitHistoryMaxSize(pub usize);
+
+#[derive(Resource)]
+pub struct OrbitHistoryUpdateInterval {
+    pub since_last: f32,
+    pub max_interval: f32,
 }
 
 #[derive(Component)]
@@ -54,7 +66,7 @@ impl OrbitHistoryBundle {
                 },
                 history: OrbitHistoryMesh {
                     orbit_mesh: line_mesh_id,
-                    history: vec![],
+                    history: VecDeque::new(),
                 },
                 culling: NoFrustumCulling,
             })
@@ -65,12 +77,17 @@ impl OrbitHistoryBundle {
 pub struct OrbitHistoryPlugin;
 impl Plugin for OrbitHistoryPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(SelectedReferenceFrame {
+        app.insert_resource(OrbitHistoryUpdateInterval {
+            since_last: 0.,
+            max_interval: 1.,
+        })
+        .insert_resource(OrbitHistoryMaxSize(1000000))
+        .insert_resource(SelectedReferenceFrame {
             // Show orbit history relative to this body
             target: Entity::PLACEHOLDER,
         })
         .add_systems(
-            Update,
+            FixedUpdate,
             update_orbit_history
                 .in_set(OrbitSets::DrawHistory)
                 .after(PhysicsSet::All)
@@ -84,17 +101,26 @@ fn update_orbit_history(
     history_objects: Query<(&OrbitHistoryEntity, &FloatingOriginPosition)>,
     mut histories: Query<&mut OrbitHistoryMesh>,
     reference: Res<SelectedReferenceFrame>,
+    max_length: Res<OrbitHistoryMaxSize>,
+    mut last_update: ResMut<OrbitHistoryUpdateInterval>,
+    time: Res<Time<Fixed>>,
 ) {
+    last_update.since_last += time.delta_seconds();
+    if last_update.since_last < last_update.max_interval {
+        return;
+    } else {
+        last_update.since_last -= last_update.max_interval;
+    }
+
     // Add current position to our history
     history_objects.iter().for_each(|(history, origin)| {
-        histories
-            .get_mut(history.0)
-            .expect("")
-            .history
-            .push(origin.0);
+        let mut history = histories.get_mut(history.0).expect("");
+        history.history.push_back(origin.0);
+        if history.history.len() > max_length.0 {
+            info!("Pruning front: {} {}", history.history.len(), max_length.0);
+            history.history.pop_front();
+        }
     });
-
-    info!("Target is {:?}", reference.target);
 
     // Get reference frame history
     let ref_history = match histories.get(reference.target) {
@@ -111,7 +137,7 @@ fn update_orbit_history(
             Some(ref h) => h
                 .iter()
                 .zip(history.history.iter())
-                .map(|(reference, own)| (*own - *reference + *h.last().expect("")).as_vec3())
+                .map(|(reference, own)| (*own - *reference + *h.back().expect("")).as_vec3())
                 .collect(),
             None => history.history.iter().map(|v| v.as_vec3()).collect(),
         };

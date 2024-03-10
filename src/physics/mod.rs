@@ -14,6 +14,7 @@ use crate::physics::{
 };
 
 // Only expose components to world for queries
+pub mod bundles;
 pub mod components;
 pub mod resources;
 pub mod systemsets;
